@@ -1,0 +1,494 @@
+'''
+API contract for the Swap & Sell marketplace
+'''
+
+============================================================
+1 Authentication
+
+1.1 Log in
+    POST /api/auth/login
+Request:
+    {
+    "username": "string",
+    "password": "string"
+    }
+
+
+Response:
+    200 OK
+    {
+    "status": "success",
+    "data": {
+        "userId": "integer",
+        "username": "string",
+        "token": "string",
+        "tokenExpiry": "ISO8601 datetime"
+        }
+    }
+
+    401 UNAUTHORIZED
+    {
+    "status": "error",
+    "error": {
+        "code": "INVALID_CREDENTIALS",
+        "message": "Invalid username or password!"
+        }
+    }
+
+
+
+1.2 Register
+    POST /api/auth/register
+Request:
+    {
+    "username": "string",
+    "email": "string",
+    "password": "string",
+    }
+
+
+Response:
+201 CREATED
+    {
+    "status": "success",
+    "data": {
+        "userId": "integer",
+        "username": "string",
+        "email": "string"
+        }
+    }
+400 BAD REQUEST
+    {
+    "status": "error",
+    "error": {
+        "code": "USER_EXISTS",
+        "message": "Username or email already exists"
+        }
+    }
+
+============================================================
+2 Item management
+
+2.1 Browse items
+    GET /api/items
+Request parameters:
+    {
+    "page": "integer (optional, default: 1)",
+    "limit": "integer (optional, default: 20)"
+    }
+
+
+Response:
+200 OK
+    {
+    "status": "success",
+    "data": {
+        "items": [
+        {
+            "itemId": "integer",
+            "title": "string",
+            "description": "string",
+            "price": "number",
+            "images": ["string"],
+            "sellerId": "integer",
+            "sellerName": "string",
+            "category": "string",
+            "createdAt": "ISO8601 datetime",
+            "location": "string"
+            }
+        ],
+        "pages": {
+            "page": "integer",
+            "limit": "integer",
+            "totalItems": "integer",
+            "totalPages": "integer"
+            }
+        }
+    }
+
+
+2.2 Search for items
+    GET /api/items/search
+Request parameters
+    {
+    "query": "string (required)",
+    "page": "integer (optional, default: 1)",
+    "limit": "integer (optional, default: 20)"
+    }
+
+Response:
+200 OK (with results)
+    {
+    "status": "success",
+    "data": {
+        "items": [
+        {
+            "itemId": "integer",
+            "title": "string",
+            "description": "string",
+            "price": "number",
+            "images": ["string"],
+            "sellerId": "integer",
+            "sellerName": "string",
+            "category": "string",
+            "createdAt": "ISO8601 datetime",
+            "location": "string"
+            }
+        ],
+        "pages": {
+            "page": "integer",
+            "limit": "integer",
+            "totalItems": "integer",
+            "totalPages": "integer"
+            }
+        }
+    }
+
+200 OK (with no results)
+    {
+    "status": "success",
+    "data": {
+        "items": [],
+        "pagination": {
+        "page": 1,
+        "limit": 20,
+        "totalItems": 0,
+        "totalPages": 0
+            }
+        }
+    }
+
+
+2.3 Filter items
+    POST /api/items/filter
+Request
+    {
+    "category": "string (optional)",
+    "minPrice": "number (optional)",
+    "maxPrice": "number (optional)",
+    "location": "string (optional)",
+    "sellerName": "string (optional)",
+    "location": "string (optional)",
+    "page": "integer (optional, default: 1)",
+    "limit": "integer (optional, default: 20)"
+    }
+
+
+Response (same as search for items):
+200 OK (with results)
+    {
+    "status": "success",
+    "data": {
+        "items": [
+        {
+            "itemId": "integer",
+            "title": "string",
+            "description": "string",
+            "price": "number",
+            "images": ["string"],
+            "sellerId": "integer",
+            "sellerName": "string",
+            "category": "string",
+            "createdAt": "ISO8601 datetime",
+            "location": "string"
+            }
+        ],
+        "pages": {
+            "page": "integer",
+            "limit": "integer",
+            "totalItems": "integer",
+            "totalPages": "integer"
+            }
+        }
+    }
+
+200 OK (with no results)
+    {
+    "status": "success",
+    "data": {
+        "items": [],
+        "pagination": {
+        "page": 1,
+        "limit": 20,
+        "totalItems": 0,
+        "totalPages": 0
+            }
+        }
+    }
+
+
+
+============================================================
+3 Bidding
+3.1 Placing a bid
+    POST /api/items/{itemId}/bids
+Request
+    {
+    "amount": "number",
+    "userId": "integer",
+    "username": "string
+    }
+
+
+Response
+201 CREATED
+    {
+    "status": "success",
+    "data": {
+        "bidId": "integer",
+        "itemId": "integer",
+        "amount": "number",
+        "userId": "integer",
+        "username": "string",
+        "timestamp": "ISO8601 datetime",
+        "status": "pending"
+        }
+    }
+
+400 BAD REQUEST
+{
+  "status": "error",
+  "error": {
+    "code": "INVALID_BID",
+    "message": "Bid amount must be higher than current highest bid."
+  }
+}
+
+
+3.2 Submit bid
+    PUT /api/bids/{bidId}/confirm
+Request
+    {
+    "userId": "integer",
+    "username": "string"
+    }
+
+Response
+    200 OK
+    {
+    "status": "success",
+    "data": {
+        "bidId": "integer",
+        "status": "confirmed",
+        "confirmedAt": "ISO8601 datetime"
+        }
+    }
+
+
+3.3 Notify seller
+    POST /api/sellers/{sellerId}/notifications
+Request
+    {
+    "type": "bid_placed",
+    "itemId": "integer",
+    "bidId": "integer",
+    "bidAmount": "number",
+    "bidderId": "integer",
+    "bidderName": "string"
+    }
+
+Response
+200 OK
+    {
+    "status": "success",
+    "data": {
+        "notificationId": "string",
+        "delivered": true
+        }
+    }
+
+
+============================================================
+4. Transaction/Purchase
+4.1 Verify transaction details
+    POST /api/transactions/verify
+Request
+    {
+    "itemId": "integer",
+    "userId": "integer",
+    "amount": "number"
+    }
+
+
+Response
+200 OK
+    {
+    "status": "success",
+    "data": {
+        "transactionId": "integer",
+        "itemId": "integer",
+        "sellerId": "integer",
+        "buyerId": "integer",
+        "amount": "number",
+        "verified": true
+        }
+    }
+
+
+4.2 Buy Now
+    POST /api/transactions/purchase
+Request
+    {
+    "itemId": "integer",
+    "userId": "integer",
+    "paymentMethodId": "string"
+    }
+
+
+Response
+    {
+    "status": "success",
+    "data": {
+        "transactionId": "integer",
+        "itemId": "integer",
+        "status": "unshipped",
+        "purchasedAt": "ISO8601 datetime"
+        }
+    }
+
+
+4.3 Confirm shipment
+    PUT /api/transactions/{transactionId}/shipment
+Request
+    {
+    "sellerId": "integer",
+    "trackingNumber": "string (optional)",
+    "carrier": "string (optional)"
+    }
+
+
+Response
+    {
+    "status": "success",
+    "data": {
+        "transactionId": "integer",
+        "status": "shipped",
+        "shippedAt": "ISO8601 datetime",
+        "trackingNumber": "string",
+        "carrier": "string"
+        }
+    }
+
+
+============================================================
+5 Payment 
+5.1 Valdiate credentials
+    POST /api/payments/validate
+Request
+    {
+    "paymentMethodId": "string",
+    "userId": "integer",
+    "cardNumber": "string (encrypted)",
+    "cvv": "string (encrypted)",
+    "expiryDate": "string"
+    }
+
+
+Response
+200 OK
+    {
+    "status": "success",
+    "data": {
+        "valid": true,
+        "paymentMethodId": "string"
+        }
+    }
+
+400 BAD REQUEST
+    {
+    "status": "error",
+    "error": {
+        "code": "INVALID_PAYMENT_METHOD",
+        "message": "Payment credentials are invalid"
+        }
+    }
+
+
+
+============================================================
+6 Messaging
+6.1 Retrieve message
+    GET /api/messages/{userId}
+Request
+    {
+    "conversationId": "string (optional)",
+    "limit": "integer (optional, default=50)",
+    "offset": "integer (optional, default=0)"
+    }
+
+
+Response
+    {
+    "status": "success",
+    "data": {
+        "messages": [
+        {
+            "messageId": "string",
+            "conversationId": "string",
+            "senderId": "integer",
+            "receiverId": "integer",
+            "content": "string",
+            "timestamp": "ISO8601 datetime",
+            "attachments": ["string"]
+                }
+            ]
+        }
+    }
+
+
+6.2 Send message
+    POST /api/messages
+Request
+    {
+    "senderId": "integer",
+    "receiverId": "integer",
+    "content": "string",
+    "conversationId": "string (optional)",
+    "attachments": ["string (optional)"]
+    }
+
+
+Response
+201 CREATED
+    {
+    "status": "success",
+    "data": {
+        "messageId": "string",
+        "conversationId": "string",
+        "status": "sent",
+        "timestamp": "ISO8601 datetime"
+        }
+    }
+
+
+
+============================================================
+7. Common Response Codes
+200: Success - Request completed successfully
+201: Created - Resource created successfully
+400: Bad Request - Invalid input or validation error
+401: Unauthorized - Authentication required or failed
+403: Forbidden - User lacks permission
+404: Not Found - Resource doesn't exist
+409: Conflict - Resource conflict (e.g., duplicate)
+500: Internal Server Error - Server-side error
+
+============================================================
+8. Authentication
+
+All authenticated endpoints require a Bearer token in the Authorization header:
+Authorization: Bearer {token}
+
+Tokens expire after 24 hours and must be refreshed or users must re-authenticate.
+
+============================================================
+9. Rate Limiting
+
+API requests are limited to:
+1000 requests per hour (authenticated users)
+100 requests per hour (unauthenticated users)
+
+Rate limit headers included in responses:
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 999
+X-RateLimit-Reset: 1640000000
