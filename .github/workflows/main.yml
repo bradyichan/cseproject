@@ -36,6 +36,9 @@ jobs:
           python-version: ${{ matrix.python-version }}
       # Pylint is a static code analysis tool. Use this block as is to install pylint
       #  in the Docker container running the job
+      - name: Install flask
+        run: |
+          pip install flask
       - name: Install pylint
         run: |
           python -m pip install --upgrade pip
