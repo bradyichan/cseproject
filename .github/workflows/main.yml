@@ -3,7 +3,7 @@ name: Python package
 # This is a trigger for any push to the repo
 # on: [push]
 
-This trigger would only happen on a push to the lab3 branch
+#This trigger would only happen on a push to the lab3 branch
 on:
   push:
     branches:
