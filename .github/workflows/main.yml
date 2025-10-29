@@ -10,7 +10,7 @@ on:
       # Set this to "main" or "master" or whatever your main branch is called
       - main
       - develop
-      - ci-setup
+      - ci-and-tests
 
 jobs:
   # Each job runs in parallel
