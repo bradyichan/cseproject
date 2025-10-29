@@ -7,12 +7,12 @@ import sys
 import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from main import app
+import main
 
 
 @pytest.fixture(scope="module")
 def client():
-    with app.test_client() as c:
+    with main.app.test_client() as c:
         yield c
 
 
@@ -41,7 +41,7 @@ def test_blueprints_registered():
     # Ensure blueprints from main.py are actually registered on the Flask app
     expected_blueprints = {"users", "items", "search", "bidding", "payment", "messaging"}
     # app.blueprints keys are the blueprint "name" (first arg when creating Blueprint)
-    registered = set(app.blueprints.keys())
+    registered = set(main.app.blueprints.keys())
     missing = expected_blueprints - registered
     assert not missing, f"Missing blueprints: {missing}"
 
@@ -53,7 +53,7 @@ def test_api_prefixes_exist_in_url_map():
     """
     # Accept either '/messages' (listed in your JSON) or '/messaging' (blueprint prefix)
     prefixes = ["/users", "/items", "/search", "/bidding", "/payment", "/messaging"]
-    url_rules = [rule.rule for rule in app.url_map.iter_rules()]
+    url_rules = [rule.rule for rule in main.app.url_map.iter_rules()]
 
     missing = []
     for prefix in prefixes:
