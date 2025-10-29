@@ -1,10 +1,13 @@
 # tests/test_bidding.py
 import copy
 import importlib
+import sys
+import os
 
 import pytest
 from flask import Flask
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import bidding
 
 
