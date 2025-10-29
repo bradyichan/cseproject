@@ -30,7 +30,6 @@ def test_root_ok(app_client) -> None:
     assert data.get("message") == "Marketplace API is running"
     assert "endpoints" in data
     assert isinstance(data["endpoints"], list)
-    # Accept either '/messages' or '/messaging'
     assert "/messages" in data["endpoints"] or "/messaging" in data["endpoints"]
 
 
@@ -58,7 +57,6 @@ def test_api_prefixes_exist_in_url_map() -> None:
         if not any(rule == prefix or rule.startswith(prefix + "/") for rule in url_rules):
             missing.append(prefix)
 
-    # If '/messaging' is missing but '/messages' exists, treat as acceptable
     if "/messaging" in missing and any(
         rule == "/messages" or rule.startswith("/messages/") for rule in url_rules
     ):
@@ -72,6 +70,6 @@ def test_api_prefixes_exist_in_url_map() -> None:
     ["/users", "/items", "/search", "/bidding", "/payment", "/messaging", "/messages"],
 )
 def test_each_api_path_not_server_error(app_client, path: str) -> None:
-    """Base paths should not return a 5xx error; 2xx/3xx/4xx are acceptable here."""
+    """Base paths should not return a 5xx error; 2xx/3xx/4xx are acceptable."""
     resp = app_client.get(path)
     assert resp.status_code < 500, f"{path} returned {resp.status_code}"
