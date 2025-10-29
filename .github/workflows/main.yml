@@ -43,7 +43,7 @@ jobs:
       # Run pylint on your pulled code in the Docker container running the job
       - name: Analysing the code with pylint
         run: |
-          pylint $(git ls-files 'backend/*.py')
+          pylint backend/*.py backend/*/ --ignore=tests
       # Pytest is for unit testing your python code. Use this block as is to 
       # install pytest in the Docker container running the job
       - name: Install pytest
