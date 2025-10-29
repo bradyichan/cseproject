@@ -1,54 +1,55 @@
-# tests/test_main.py
-import json
-import re
+"""Pytest suite for backend.main.
+
+Covers:
+- Root endpoint response and CORS header.
+- Blueprint registration.
+- Presence of routes under expected API prefixes.
+- Basic non-5xx sanity checks for each base API path.
+"""
+
+from typing import Iterator
 
 import pytest
-
 from backend.main import app
 
 
 @pytest.fixture(scope="module")
-def client():
-    with app.test_client() as c:
-        yield c
+def app_client() -> Iterator:
+    """Provide a Flask test client for the application."""
+    with app.test_client() as client:
+        yield client
 
 
-def test_root_ok(client):
-    resp = client.get("/")
+def test_root_ok(app_client) -> None:
+    """Root (/) should return 200 and expected JSON structure."""
+    resp = app_client.get("/")
     assert resp.status_code == 200
 
-    # Validate JSON structure
     data = resp.get_json()
     assert isinstance(data, dict)
     assert data.get("message") == "Marketplace API is running"
     assert "endpoints" in data
     assert isinstance(data["endpoints"], list)
-    # Your current main.py lists "/messages" (not "/messaging")
+    # Accept either '/messages' or '/messaging'
     assert "/messages" in data["endpoints"] or "/messaging" in data["endpoints"]
 
 
-def test_cors_header_present_on_root(client):
-    # Flask-CORS should attach this header by default when CORS(app) is used
-    resp = client.get("/")
-    # Header may be "*" or specific origin depending on config
+def test_cors_header_present_on_root(app_client) -> None:
+    """Flask-CORS should attach an Access-Control-Allow-Origin header."""
+    resp = app_client.get("/")
     assert "Access-Control-Allow-Origin" in resp.headers
 
 
-def test_blueprints_registered():
-    # Ensure blueprints from main.py are actually registered on the Flask app
-    expected_blueprints = {"users", "items", "search", "bidding", "payment", "messaging"}
-    # app.blueprints keys are the blueprint "name" (first arg when creating Blueprint)
+def test_blueprints_registered() -> None:
+    """All expected blueprints should be registered on the Flask app."""
+    expected = {"users", "items", "search", "bidding", "payment", "messaging"}
     registered = set(app.blueprints.keys())
-    missing = expected_blueprints - registered
+    missing = expected - registered
     assert not missing, f"Missing blueprints: {missing}"
 
 
-def test_api_prefixes_exist_in_url_map():
-    """
-    Instead of calling specific endpoints (which may vary per team),
-    verify each API prefix has at least one route registered.
-    """
-    # Accept either '/messages' (listed in your JSON) or '/messaging' (blueprint prefix)
+def test_api_prefixes_exist_in_url_map() -> None:
+    """Each API prefix should have at least one registered route."""
     prefixes = ["/users", "/items", "/search", "/bidding", "/payment", "/messaging"]
     url_rules = [rule.rule for rule in app.url_map.iter_rules()]
 
@@ -57,10 +58,9 @@ def test_api_prefixes_exist_in_url_map():
         if not any(rule == prefix or rule.startswith(prefix + "/") for rule in url_rules):
             missing.append(prefix)
 
-    # If '/messaging' is missing but '/messages' exists, treat that as acceptable
+    # If '/messaging' is missing but '/messages' exists, treat as acceptable
     if "/messaging" in missing and any(
-        rule == "/messages" or rule.startswith("/messages/")
-        for rule in url_rules
+        rule == "/messages" or rule.startswith("/messages/") for rule in url_rules
     ):
         missing.remove("/messaging")
 
@@ -71,11 +71,7 @@ def test_api_prefixes_exist_in_url_map():
     "path",
     ["/users", "/items", "/search", "/bidding", "/payment", "/messaging", "/messages"],
 )
-def test_each_api_path_not_server_error(client, path):
-    """
-    Sanity check: hitting each base path should not 5xx.
-    Some bases may 404 (no index route defined), and that's fine.
-    This keeps the test suite robust across different blueprint implementations.
-    """
-    resp = client.get(path)
+def test_each_api_path_not_server_error(app_client, path: str) -> None:
+    """Base paths should not return a 5xx error; 2xx/3xx/4xx are acceptable here."""
+    resp = app_client.get(path)
     assert resp.status_code < 500, f"{path} returned {resp.status_code}"
