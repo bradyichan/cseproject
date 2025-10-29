@@ -5,9 +5,8 @@ mock data for Milestone 5 of the Marketplace project.
 Author: Team XX - CSE 2102
 Date: 2025-10-27
 """
-
-from flask import Blueprint, jsonify, request
 from datetime import datetime
+from flask import Blueprint, jsonify, request
 
 users_bp = Blueprint("users", __name__, url_prefix="/users")
 

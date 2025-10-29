@@ -5,9 +5,8 @@ to simulate user communication within the Marketplace app.
 Author: Team XX - CSE 2102
 Date: 2025-10-27
 """
-
-from flask import Blueprint, jsonify, request
 from datetime import datetime
+from flask import Blueprint, jsonify, request
 
 messaging_bp = Blueprint("messaging", __name__, url_prefix="/messages")
 

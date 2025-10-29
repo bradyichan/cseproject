@@ -11,7 +11,8 @@ from flask_cors import CORS
 from flasgger import Swagger
 
 # Import all route blueprints
-from users import users_bp
+import users
+#from users import users_bp
 from items import items_bp
 from search import search_bp
 from bidding import bidding_bp
@@ -24,7 +25,7 @@ CORS(app)
 Swagger(app)
 
 # Register blueprints
-app.register_blueprint(users_bp)
+app.register_blueprint(users.users_bp)
 app.register_blueprint(items_bp)
 app.register_blueprint(search_bp)
 app.register_blueprint(bidding_bp)
@@ -34,6 +35,7 @@ app.register_blueprint(messaging_bp)
 # Root endpoint
 @app.route("/")
 def home():
+    '''this function returns home API status'''
     return jsonify({
         "message": "Marketplace API is running",
         "endpoints": [

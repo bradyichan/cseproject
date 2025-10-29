@@ -39,13 +39,13 @@ def send_credentials():
     if validate_credentials(card_number, cvv, name, zip_code):
         verifications[token]["status"] = "verified"
         return jsonify({"status": "verified", "token": token}), 200
-    else:
-        verifications[token]["status"] = "invalid"
-        return jsonify({
-            "status": "invalid",
-            "message": "Invalid card info. Try again.",
-            "token": token
-        }), 400
+    
+    verifications[token]["status"] = "invalid"
+    return jsonify({
+        "status": "invalid",
+        "message": "Invalid card info. Try again.",
+        "token": token
+    }), 400
 
 
 @payment_bp.route("/confirm", methods=["POST"])
