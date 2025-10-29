@@ -39,6 +39,8 @@ jobs:
       - name: Install flask
         run: |
           pip install flask
+          pip install flask-cors
+          pip install flasgger
       - name: Install pylint
         run: |
           python -m pip install --upgrade pip
