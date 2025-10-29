@@ -15,14 +15,14 @@ from backend.main import app
 
 @pytest.fixture(scope="module")
 def app_client() -> Iterator:
-    """Provide a Flask test client for the application."""
+    """Provide a Flask test client."""
     with app.test_client() as client:
         yield client
 
 
-def test_root_ok(app_client) -> None:
+def test_root_ok(client=pytest.lazy_fixture("app_client")) -> None:
     """Root (/) should return 200 and expected JSON structure."""
-    resp = app_client.get("/")
+    resp = client.get("/")
     assert resp.status_code == 200
 
     data = resp.get_json()
@@ -33,9 +33,9 @@ def test_root_ok(app_client) -> None:
     assert "/messages" in data["endpoints"] or "/messaging" in data["endpoints"]
 
 
-def test_cors_header_present_on_root(app_client) -> None:
+def test_cors_header_present_on_root(client=pytest.lazy_fixture("app_client")) -> None:
     """Flask-CORS should attach an Access-Control-Allow-Origin header."""
-    resp = app_client.get("/")
+    resp = client.get("/")
     assert "Access-Control-Allow-Origin" in resp.headers
 
 
@@ -69,7 +69,7 @@ def test_api_prefixes_exist_in_url_map() -> None:
     "path",
     ["/users", "/items", "/search", "/bidding", "/payment", "/messaging", "/messages"],
 )
-def test_each_api_path_not_server_error(app_client, path: str) -> None:
-    """Base paths should not return a 5xx error; 2xx/3xx/4xx are acceptable."""
-    resp = app_client.get(path)
-    assert resp.status_code < 500, f"{path} returned {resp.status_code}"
+def test_each_api_path_not_server_error(client=pytest.lazy_fixture("app_client"), path: str = "") -> None:
+    """Base paths should not return a 5xx error."""
+    resp = client.get(path)
+    assert resp.status_code < 500
