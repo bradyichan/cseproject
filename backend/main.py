@@ -11,13 +11,13 @@ from flask_cors import CORS
 from flasgger import Swagger
 
 # Import all route blueprints
-from users import users_bp
+from .users import users_bp
 #from users import users_bp
-from items import items_bp
-from search import search_bp
-from bidding import bidding_bp
-from payment import payment_bp
-from messaging import messaging_bp
+from .items import items_bp
+from .search import search_bp
+from .bidding import bidding_bp
+from .payment import payment_bp
+from .messaging import messaging_bp
 
 # Initialize Flask
 app = Flask(__name__)
