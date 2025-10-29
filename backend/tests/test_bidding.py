@@ -5,7 +5,7 @@ import importlib
 import pytest
 from flask import Flask
 
-from ..bidding import *
+import backend.bidding
 
 
 @pytest.fixture(scope="function")
@@ -15,21 +15,21 @@ def app_client():
     for each test. Restores globals after test completes.
     """
     # Snapshot originals
-    original_items = copy.deepcopy(items)
-    original_bids = copy.deepcopy(bids)
+    original_items = copy.deepcopy(backend.bidding.items)
+    original_bids = copy.deepcopy(backend.bidding.bids)
 
     # Build app & register blueprint
     app = Flask(__name__)
-    app.register_blueprint(bidding_bp)
+    app.register_blueprint(backend.bidding.bidding_bp)
     client = app.test_client()
 
     yield client
 
     # Restore globals
-    items.clear()
-    items.update(copy.deepcopy(original_items))
-    bids.clear()
-    bids.extend(copy.deepcopy(original_bids))
+    backend.bidding.items.clear()
+    backend.bidding.items.update(copy.deepcopy(original_items))
+    backend.bidding.bids.clear()
+    backend.bidding.bids.extend(copy.deepcopy(original_bids))
 
 
 def test_get_all_items(app_client):
@@ -106,7 +106,7 @@ def test_buy_now_happy_path_and_blocks_further_bids(app_client):
     assert b["status"] == "purchased"
     assert b["confirmation"]["item_id"] == 2
     assert b["confirmation"]["buyer"] == "alex"
-    assert b["confirmation"]["amount"] == items[2]["buy_now"]
+    assert b["confirmation"]["amount"] == backend.bidding.items[2]["buy_now"]
     assert b["confirmation"]["confirmation_code"].startswith("BUY-")
 
     # Once sold, trying to bid should fail with "Bidding closed"

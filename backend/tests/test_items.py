@@ -5,7 +5,7 @@ import re
 import pytest
 from flask import Flask
 
-from items import *  # your items.py module
+import backend.items # your items.py module
 
 
 @pytest.fixture(scope="function")
