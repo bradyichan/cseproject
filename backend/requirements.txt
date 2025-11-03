@@ -1,0 +1,4 @@
+#Requirements!
+Flask
+flask_cors
+flasgger

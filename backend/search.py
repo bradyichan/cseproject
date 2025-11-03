@@ -36,7 +36,7 @@ def search_items():
         if query and query not in item["title"].lower():
             continue
         # Category filter
-        if category and category != item["category"].lower():
+        if category and category not in item["category"].lower():
             continue
         # Price range filter
         if min_price and item["price"] < min_price:
