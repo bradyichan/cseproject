@@ -1,0 +1,62 @@
+name: Python package
+
+# This is a trigger for any push to the repo
+# on: [push]
+
+#This trigger would only happen on a push to the lab3 branch
+on:
+  push:
+    branches:
+      # Set this to "main" or "master" or whatever your main branch is called
+      - main
+      - develop
+      - ci-and-tests
+
+jobs:
+  # Each job runs in parallel
+  name_your_job_whatever_you_want:
+
+    # runs-on indicates which GitHub "Runners" will run this CICD pipeline
+    # For all CSE-2102 repos, just use the following line as is
+    runs-on: self-hosted
+    # This next block allows you to run this ENTIRE job on different python versions
+    strategy:
+      matrix:
+        #python-version: ["3.7", "3.8", "3.9", "3.10", "3.11"]
+        python-version: ["3.8"]
+
+    # Steps are run in sequence in this job. If one step fails, the entire job fails.
+    steps:
+      # Use this next line to pull your repo into the Docker container running the job
+      - uses: actions/checkout@v3
+      # This block sets up the python version
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      # Pylint is a static code analysis tool. Use this block as is to install pylint
+      #  in the Docker container running the job
+      - name: Install flask
+        run: |
+          pip install flask
+          pip install flask-cors
+          pip install flasgger
+      - name: Install pylint
+        run: |
+          python -m pip install --upgrade pip
+          pip install pylint
+      # Run pylint on your pulled code in the Docker container running the job
+      - name: Analysing the code with pylint
+        run: |
+          pylint backend/*.py backend/*/ --ignore=tests
+      # Pytest is for unit testing your python code. Use this block as is to 
+      # install pytest in the Docker container running the job
+      - name: Install pytest
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      # Run pytest on your pulled codebase
+      - name: Test with pytest
+        run: |
+          pytest

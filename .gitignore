@@ -1,0 +1,16 @@
+# Python cache and compiled files
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+venv/
+env/
+
+# IDE and OS junk
+.vscode/
+.DS_Store
+
+# Test and build artifacts
+.pytest_cache/
+*.log
