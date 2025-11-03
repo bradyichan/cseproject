@@ -1,101 +1,169 @@
 """
 Module: items.py
-Description: Provides CRUD endpoints for item listings including create,
-read, update, and delete operations using mock item data.
-Author: Team XX - CSE 2102
-Date: 2025-10-27
+Description: Handles item creation, retrieval, update, and deletion
+for the Marketplace API using SQLite for persistence.
+Author: Team 22 - CSE 2102
+Date: 2025-11-03
 """
+
 from datetime import datetime
 from flask import Blueprint, jsonify, request
+import sqlite3
+import os
 
 items_bp = Blueprint("items", __name__, url_prefix="/items")
 
-# Mock item data
-items = {
-    1: {"id": 1, "title": "Gaming Laptop", "category": "Electronics",
-        "price": 750, "seller": "alex", "status": "available"},
-    2: {"id": 2, "title": "Vintage Lamp", "category": "Home Decor",
-        "price": 40, "seller": "ethan", "status": "available"},
-    3: {"id": 3, "title": "Mountain Bike", "category": "Sports",
-        "price": 300, "seller": "alex", "status": "available"},
-}
-
-# Counter for next available item ID
-next_id = {"value": 4}
+DB_PATH = os.path.join(os.path.dirname(__file__), "db", "marketplace.db")
 
 
-@items_bp.route("/", methods=["GET"])
+def get_db_connection():
+    """Establish connection to the SQLite database."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+@items_bp.route("/add", methods=["POST"])
+def add_item():
+    """Add a new item to the marketplace."""
+    data = request.get_json() or {}
+
+    required_fields = ["title", "description", "category", "price", "location", "seller_id"]
+    if not all(f in data for f in required_fields):
+        return jsonify({"status": "error", "message": "Missing required fields"}), 400
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    created_at = datetime.now().isoformat()
+
+    cursor.execute("""
+        INSERT INTO items (title, description, category, price, location, seller_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        data["title"],
+        data["description"],
+        data["category"],
+        data["price"],
+        data["location"],
+        data["seller_id"],
+        created_at
+    ))
+
+    conn.commit()
+    item_id = cursor.lastrowid
+    conn.close()
+
+    return jsonify({
+        "status": "success",
+        "data": {
+            "item_id": item_id,
+            "title": data["title"],
+            "price": data["price"],
+            "created_at": created_at
+        }
+    }), 201
+
+
+@items_bp.route("/all", methods=["GET"])
 def get_all_items():
-    """Return all listed items."""
-    return jsonify({"count": len(items), "items": list(items.values())}), 200
+    """Return all items currently listed."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id AS item_id, title, description, category, price, location, seller_id, created_at
+        FROM items
+        ORDER BY created_at DESC
+    """)
+    rows = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+
+    return jsonify({"status": "success", "data": {"items": rows}}), 200
 
 
 @items_bp.route("/<int:item_id>", methods=["GET"])
-def get_item(item_id):
-    """Return one item by ID."""
-    item = items.get(item_id)
-    if not item:
-        return jsonify({"error": "Item not found"}), 404
-    return jsonify(item), 200
+def get_item_by_id(item_id):
+    """Retrieve a specific item by its ID."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id AS item_id, title, description, category, price, location, seller_id, created_at
+        FROM items
+        WHERE id = ?
+    """, (item_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        return jsonify({"status": "error", "message": "Item not found"}), 404
+
+    return jsonify({"status": "success", "data": dict(row)}), 200
 
 
-@items_bp.route("/create", methods=["POST"])
-def create_item():
-    """Create a new mock item listing."""
-    data = request.get_json() or {}
-
-    title = data.get("title")
-    category = data.get("category")
-    price = data.get("price")
-    seller = data.get("seller")
-
-    if not all([title, category, price, seller]):
-        return jsonify({"error": "Missing title, category, price, or seller"}), 400
-
-    # Generate new ID safely (no global variable)
-    new_id = next_id["value"]
-    next_id["value"] += 1
-
-    new_item = {
-        "id": new_id,
-        "title": title,
-        "category": category,
-        "price": float(price),
-        "seller": seller,
-        "status": "available",
-        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }
-    items[new_id] = new_item
-
-    return jsonify({"status": "created", "item": new_item}), 201
-
-
-@items_bp.route("/<int:item_id>/update", methods=["PUT"])
+@items_bp.route("/update/<int:item_id>", methods=["PUT"])
 def update_item(item_id):
-    """Update item details."""
-    item = items.get(item_id)
-    if not item:
-        return jsonify({"error": "Item not found"}), 404
-
+    """Update fields for an existing item."""
     data = request.get_json() or {}
-    for field in ["title", "category", "price", "status"]:
-        if field in data:
-            item[field] = data[field]
 
-    return jsonify({"status": "updated", "item": item}), 200
+    allowed = ["title", "description", "category", "price", "location"]
+    updates = {k: v for k, v in data.items() if k in allowed}
+
+    if not updates:
+        return jsonify({"status": "error", "message": "No valid fields to update"}), 400
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    set_clause = ", ".join([f"{key} = ?" for key in updates.keys()])
+    values = list(updates.values()) + [item_id]
+
+    cursor.execute(f"UPDATE items SET {set_clause} WHERE id = ?", values)
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "status": "success",
+        "data": {"item_id": item_id, "updated_fields": list(updates.keys())}
+    }), 200
 
 
-@items_bp.route("/<int:item_id>/delete", methods=["DELETE"])
+@items_bp.route("/delete/<int:item_id>", methods=["DELETE"])
 def delete_item(item_id):
-    """Remove an item listing."""
-    if item_id not in items:
-        return jsonify({"error": "Item not found"}), 404
-    deleted = items.pop(item_id)
-    return jsonify({"status": "deleted", "item": deleted}), 200
+    """Delete an item listing from the marketplace."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM items WHERE id = ?", (item_id,))
+    conn.commit()
+    deleted = cursor.rowcount
+    conn.close()
+
+    if deleted == 0:
+        return jsonify({"status": "error", "message": "Item not found"}), 404
+
+    return jsonify({
+        "status": "success",
+        "message": f"Item {item_id} deleted"
+    }), 200
 
 
-@items_bp.route("/seller/<string:username>", methods=["GET"])
-def get_items_by_seller(username):
-    """Return all items from a specific seller."""
-    user_items = [item for item in items.values() if item["seller"] == username]
-    return jsonify({"seller": username, "items": user_items}), 200
+@items_bp.route("/search", methods=["GET"])
+def search_items():
+    """
+    Search for items by title or category.
+    Example: /items/search?query=phone
+    """
+    query = request.args.get("query", "").strip()
+    if not query:
+        return jsonify({"status": "error", "message": "Missing search query"}), 400
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id AS item_id, title, description, category, price, location, seller_id
+        FROM items
+        WHERE title LIKE ? OR category LIKE ?
+        ORDER BY created_at DESC
+    """, (f"%{query}%", f"%{query}%"))
+    results = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+
+    return jsonify({"status": "success", "data": {"results": results}}), 200

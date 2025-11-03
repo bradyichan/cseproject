@@ -1,118 +1,145 @@
 """
 Module: bidding.py
-Description: Handles bidding and buy-now functionality for auction items,
-including bid placement, status checks, and bid history.
-Author: Team XX - CSE 2102
-Date: 2025-10-27
+Description: Handles bid placement, retrieval, and acceptance logic for the
+Marketplace API using SQLite for persistence.
+Author: Team 22 - CSE 2102
+Date: 2025-11-03
 """
+
 from datetime import datetime
 from flask import Blueprint, jsonify, request
+import sqlite3
+import os
 
 bidding_bp = Blueprint("bidding", __name__, url_prefix="/bidding")
 
-# Mock data
-items = {
-    1: {"name": "Gaming Laptop", "current_bid": 500, "buy_now": 800,
-        "highest_bidder": None, "status": "open"},
-    2: {"name": "Headphones", "current_bid": 40, "buy_now": 60,
-        "highest_bidder": None, "status": "open"}
-}
-
-bids = []  # store all bids
-
-@bidding_bp.route("/items", methods=["GET"])
-def get_all_items():
-    """Display all auction items (display_item_details)."""
-    return jsonify({"items": items}), 200
+DB_PATH = os.path.join(os.path.dirname(__file__), "db", "marketplace.db")
 
 
-@bidding_bp.route("/item/<int:item_id>", methods=["GET"])
-def get_item(item_id):
-    """Return details of a specific item."""
-    if item_id not in items:
-        return jsonify({"error": "Item not found"}), 404
-    return jsonify(items[item_id]), 200
+def get_db_connection():
+    """Create a connection to the SQLite database."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
-@bidding_bp.route("/item/<int:item_id>/bid", methods=["POST"])
-def place_bid(item_id):
-    """Place a bid on an item."""
+@bidding_bp.route("/place", methods=["POST"])
+def place_bid():
+    """
+    Place a new bid for a given item.
+    Expects JSON with: item_id, bidder_id, amount
+    """
     data = request.get_json() or {}
-    bidder = data.get("bidder")
-    amount = data.get("amount")
 
-    if not all([bidder, amount]):
-        return jsonify({"error": "Missing bidder or amount"}), 400
+    required_fields = ["item_id", "bidder_id", "amount"]
+    if not all(f in data for f in required_fields):
+        return jsonify({
+            "status": "error",
+            "message": "Missing required fields"
+        }), 400
 
-    if item_id not in items:
-        return jsonify({"error": "Item not found"}), 404
+    # Insert bid into DB
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    timestamp = datetime.now().isoformat()
 
-    item = items[item_id]
-    if item["status"] != "open":
-        return jsonify({"error": "Bidding closed"}), 400
+    cursor.execute("""
+        INSERT INTO bids (item_id, bidder_id, amount, status, timestamp)
+        VALUES (?, ?, ?, ?, ?)
+    """, (data["item_id"], data["bidder_id"], data["amount"], "pending", timestamp))
 
-    if amount <= item["current_bid"]:
-        return jsonify({"status": "failed", "message": "Bid too low"}), 400
-
-    # Record bid
-    item["current_bid"] = amount
-    item["highest_bidder"] = bidder
-    bids.append({
-        "item_id": item_id,
-        "bidder": bidder,
-        "amount": amount,
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    })
+    conn.commit()
+    bid_id = cursor.lastrowid
+    conn.close()
 
     return jsonify({
         "status": "success",
-        "message": "Bid placed successfully",
-        "item_id": item_id,
-        "new_highest_bid": amount
-    }), 200
+        "data": {
+            "bid_id": bid_id,
+            "item_id": data["item_id"],
+            "bidder_id": data["bidder_id"],
+            "amount": data["amount"],
+            "status": "pending",
+            "timestamp": timestamp
+        }
+    }), 201
 
 
-@bidding_bp.route("/item/<int:item_id>/status", methods=["GET"])
-def get_bid_status(item_id):
-    """Check the current bid status of an item."""
-    if item_id not in items:
-        return jsonify({"error": "Item not found"}), 404
-
-    item = items[item_id]
-    return jsonify({
-        "item_id": item_id,
-        "current_bid": item["current_bid"],
-        "highest_bidder": item["highest_bidder"],
-        "status": item["status"]
-    }), 200
-
-
-@bidding_bp.route("/item/<int:item_id>/buy", methods=["POST"])
-def buy_now(item_id):
-    """Simulate 'buy now' (goes to payment step)."""
-    data = request.get_json() or {}
-    buyer = data.get("buyer")
-
-    if item_id not in items:
-        return jsonify({"error": "Item not found"}), 404
-    item = items[item_id]
-
-    if item["status"] != "open":
-        return jsonify({"error": "Item not available"}), 400
-
-    item["status"] = "sold"
-    confirmation = {
-        "item_id": item_id,
-        "buyer": buyer,
-        "amount": item["buy_now"],
-        "confirmation_code": f"BUY-{item_id:04}"
-    }
+@bidding_bp.route("/item/<int:item_id>", methods=["GET"])
+def get_bids_for_item(item_id):
+    """Retrieve all bids for a specific item."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id AS bid_id, bidder_id, amount, status, timestamp
+        FROM bids
+        WHERE item_id = ?
+        ORDER BY amount DESC
+    """, (item_id,))
+    bids = [dict(row) for row in cursor.fetchall()]
+    conn.close()
 
     return jsonify({
-        "status": "purchased",
-        "confirmation": confirmation
+        "status": "success",
+        "data": {"bids": bids}
     }), 200
 
+
+@bidding_bp.route("/accept/<int:bid_id>", methods=["PUT"])
+def accept_bid(bid_id):
+    """
+    Accept a bid, mark others for the same item as rejected.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Find which item this bid belongs to
+    cursor.execute("SELECT item_id FROM bids WHERE id = ?", (bid_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"status": "error", "message": "Bid not found"}), 404
+
+    item_id = row["item_id"]
+
+    # Accept this bid
+    cursor.execute("UPDATE bids SET status = 'accepted' WHERE id = ?", (bid_id,))
+    # Reject all others
+    cursor.execute("""
+        UPDATE bids SET status = 'rejected'
+        WHERE item_id = ? AND id != ?
+    """, (item_id, bid_id))
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "status": "success",
+        "data": {"bid_id": bid_id, "item_id": item_id, "status": "accepted"}
+    }), 200
+
+
+@bidding_bp.route("/highest/<int:item_id>", methods=["GET"])
+def get_highest_bid(item_id):
+    """Return the highest bid for a specific item."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id AS bid_id, bidder_id, amount, timestamp
+        FROM bids
+        WHERE item_id = ?
+        ORDER BY amount DESC
+        LIMIT 1
+    """, (item_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        return jsonify({"status": "error", "message": "No bids found"}), 404
+
+    return jsonify({
+        "status": "success",
+        "data": dict(row)
+    }), 200
 
 @bidding_bp.route("/history/<string:username>", methods=["GET"])
 def user_bid_history(username):

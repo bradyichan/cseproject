@@ -1,0 +1,7 @@
+#Requirements!
+Flask
+flask
+flask-cors
+flasgger
+pytest
+pylint

@@ -1,85 +1,73 @@
 """
 Module: search.py
-Description: Implements item search, filtering, and suggestion endpoints
-to simulate query results for the Marketplace API.
-Author: Team XX - CSE 2102
-Date: 2025-10-27
+Description: Implements a lightweight global search across items, users, and bids
+for the Marketplace API using SQLite queries.
+Author: Team 22 - CSE 2102
+Date: 2025-11-03
 """
 
 from flask import Blueprint, jsonify, request
+import sqlite3
+import os
 
 search_bp = Blueprint("search", __name__, url_prefix="/search")
 
-# Mock listings data
-listings = [
-    {"id": 1, "title": "Gaming Laptop", "category": "Electronics", "price": 750},
-    {"id": 2, "title": "Vintage Lamp", "category": "Home Decor", "price": 40},
-    {"id": 3, "title": "Mountain Bike", "category": "Sports", "price": 300},
-    {"id": 4, "title": "Leather Jacket", "category": "Clothing", "price": 100},
-    {"id": 5, "title": "Wireless Earbuds", "category": "Electronics", "price": 60}
-]
+DB_PATH = os.path.join(os.path.dirname(__file__), "db", "marketplace.db")
 
+
+def get_db_connection():
+    """Establish connection to the SQLite database."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 @search_bp.route("/", methods=["GET"])
-def search_items():
-    """Handle search queries with optional filters and sorting."""
-    query = request.args.get("q", "").lower()
-    category = request.args.get("category", "").lower()
-    min_price = request.args.get("min_price", type=float)
-    max_price = request.args.get("max_price", type=float)
-    sort_by = request.args.get("sort", "relevance")  # "price_asc", "price_desc", "relevance"
-
-    # Filter listings
-    results = []
-    for item in listings:
-        # Keyword search
-        if query and query not in item["title"].lower():
-            continue
-        # Category filter
-        if category and category != item["category"].lower():
-            continue
-        # Price range filter
-        if min_price and item["price"] < min_price:
-            continue
-        if max_price and item["price"] > max_price:
-            continue
-
-        results.append(item)
-
-    # Sorting
-    if sort_by == "price_asc":
-        results.sort(key=lambda x: x["price"])
-    elif sort_by == "price_desc":
-        results.sort(key=lambda x: x["price"], reverse=True)
-    # "relevance" leaves results as-is (since mock data isn’t scored)
-
-    if not results:
-        return jsonify({"message": "No results found", "results": []}), 404
-
-    return jsonify({"count": len(results), "results": results}), 200
-
-
-@search_bp.route("/suggestions", methods=["GET"])
-def get_suggestions():
-    """Return basic keyword suggestions for refinement."""
-    query = request.args.get("q", "").lower()
-    suggestions = []
-
+def global_search():
+    """
+    Perform a global search for a keyword across items, users, and bids.
+    Example: /search/?query=camera
+    """
+    query = request.args.get("query", "").strip()
     if not query:
-        suggestions = ["laptop", "headphones", "jacket", "lamp"]
-    else:
-        for item in listings:
-            title = item["title"].lower()
-            if query in title and title not in suggestions:
-                suggestions.append(title)
+        return jsonify({
+            "status": "error",
+            "message": "Missing search query"
+        }), 400
 
-    return jsonify({"query": query, "suggestions": suggestions}), 200
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
+    # Search items
+    cursor.execute("""
+        SELECT id AS item_id, title, description, category, price, location
+        FROM items
+        WHERE title LIKE ? OR description LIKE ? OR category LIKE ?
+    """, (f"%{query}%", f"%{query}%", f"%{query}%"))
+    items = [dict(row) for row in cursor.fetchall()]
 
-@search_bp.route("/item/<int:item_id>", methods=["GET"])
-def get_item_details(item_id):
-    """Return details for a single listing (view after search)."""
-    for item in listings:
-        if item["id"] == item_id:
-            return jsonify(item), 200
-    return jsonify({"error": "Item not found"}), 404
+    # Search users
+    cursor.execute("""
+        SELECT id AS user_id, username, email
+        FROM users
+        WHERE username LIKE ? OR email LIKE ?
+    """, (f"%{query}%", f"%{query}%"))
+    users = [dict(row) for row in cursor.fetchall()]
+
+    # Search bids
+    cursor.execute("""
+        SELECT id AS bid_id, item_id, bidder_id, amount, status
+        FROM bids
+        WHERE CAST(amount AS TEXT) LIKE ? OR status LIKE ?
+    """, (f"%{query}%", f"%{query}%"))
+    bids = [dict(row) for row in cursor.fetchall()]
+
+    conn.close()
+
+    return jsonify({
+        "status": "success",
+        "data": {
+            "items": items,
+            "users": users,
+            "bids": bids
+        }
+    }), 200
