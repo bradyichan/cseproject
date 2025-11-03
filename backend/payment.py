@@ -39,7 +39,7 @@ def send_credentials():
     if validate_credentials(card_number, cvv, name, zip_code):
         verifications[token]["status"] = "verified"
         return jsonify({"status": "verified", "token": token}), 200
-    
+
     verifications[token]["status"] = "invalid"
     return jsonify({
         "status": "invalid",

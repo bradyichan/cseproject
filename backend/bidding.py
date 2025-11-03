@@ -12,9 +12,9 @@ bidding_bp = Blueprint("bidding", __name__, url_prefix="/bidding")
 
 # Mock data
 items = {
-    1: {"name": "Gaming Laptop", "current_bid": 500, "buy_now": 800, 
+    1: {"name": "Gaming Laptop", "current_bid": 500, "buy_now": 800,
         "highest_bidder": None, "status": "open"},
-    2: {"name": "Headphones", "current_bid": 40, "buy_now": 60, 
+    2: {"name": "Headphones", "current_bid": 40, "buy_now": 60,
         "highest_bidder": None, "status": "open"}
 }
 

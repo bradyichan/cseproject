@@ -12,11 +12,11 @@ items_bp = Blueprint("items", __name__, url_prefix="/items")
 
 # Mock item data
 items = {
-    1: {"id": 1, "title": "Gaming Laptop", "category": "Electronics", 
+    1: {"id": 1, "title": "Gaming Laptop", "category": "Electronics",
         "price": 750, "seller": "alex", "status": "available"},
-    2: {"id": 2, "title": "Vintage Lamp", "category": "Home Decor", 
+    2: {"id": 2, "title": "Vintage Lamp", "category": "Home Decor",
         "price": 40, "seller": "ethan", "status": "available"},
-    3: {"id": 3, "title": "Mountain Bike", "category": "Sports", 
+    3: {"id": 3, "title": "Mountain Bike", "category": "Sports",
         "price": 300, "seller": "alex", "status": "available"},
 }
 
