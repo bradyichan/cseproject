@@ -140,3 +140,9 @@ def get_highest_bid(item_id):
         "status": "success",
         "data": dict(row)
     }), 200
+
+@bidding_bp.route("/history/<string:username>", methods=["GET"])
+def user_bid_history(username):
+    """Return all bids placed by a given user."""
+    user_bids = [b for b in bids if b["bidder"] == username]
+    return jsonify({"username": username, "bids": user_bids}), 200

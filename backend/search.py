@@ -21,7 +21,6 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-
 @search_bp.route("/", methods=["GET"])
 def global_search():
     """
