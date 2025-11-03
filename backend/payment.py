@@ -1,86 +1,196 @@
 """
 Module: payment.py
-Description: Simulates payment credential verification and order confirmation
-for completed transactions in the Marketplace API.
-Author: Team XX - CSE 2102
-Date: 2025-10-27
+Description: Implements payment credential validation, purchase confirmation,
+and payment history management for the Marketplace API.
+Author: Team 22 - CSE 2102
+Date: 2025-11-03
 """
 
+from datetime import datetime
 from flask import Blueprint, jsonify, request
+import sqlite3
+import os
 
+# Blueprint
 payment_bp = Blueprint("payment", __name__, url_prefix="/payment")
 
-# Mock data
-verifications = {}
-orders = []
+# Database path (same as in database.py or main.py)
+DB_PATH = os.path.join(os.path.dirname(__file__), "db", "marketplace.db")
 
 
-def validate_credentials(card_number, cvv, name, zip_code):
-    """Basic mock validation logic."""
-    if not (card_number and cvv and name and zip_code):
-        return False
-    digits = card_number.replace(" ", "")
-    return len(digits) in (15, 16) and cvv.isdigit() and (3 <= len(cvv) <= 4)
+def get_db_connection():
+    """Create a connection to the SQLite database."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
-@payment_bp.route("/credentials", methods=["POST"])
-def send_credentials():
-    """Validate payment credentials and return a token."""
+@payment_bp.route("/validate", methods=["POST"])
+def validate_payment():
+    """
+    Validate payment credentials.
+    ---
+    tags:
+      - Payment
+    requestBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              paymentMethodId: {type: string}
+              userId: {type: integer}
+              cardNumber: {type: string}
+              cvv: {type: string}
+              expiryDate: {type: string}
+    responses:
+      200:
+        description: Payment method validated successfully.
+      400:
+        description: Invalid payment credentials.
+    """
     data = request.get_json() or {}
-    card_number = data.get("card_number", "")
+
+    required = ["paymentMethodId", "userId", "cardNumber", "cvv", "expiryDate"]
+    if not all(k in data for k in required):
+        return jsonify({
+            "status": "error",
+            "error": {"code": "MISSING_FIELDS", "message": "Missing required fields"}
+        }), 400
+
+    card = data.get("cardNumber", "").replace(" ", "")
     cvv = data.get("cvv", "")
-    name = data.get("name", "")
-    zip_code = data.get("zip_code", "")
 
-    # Create simple token using count instead of uuid
-    token = f"VERIF-{len(verifications) + 1:04}"
-    verifications[token] = {"status": "pending"}
+    if len(card) not in (15, 16) or not cvv.isdigit() or len(cvv) not in (3, 4):
+        return jsonify({
+            "status": "error",
+            "error": {"code": "INVALID_PAYMENT_METHOD", "message": "Payment credentials are invalid"}
+        }), 400
 
-    if validate_credentials(card_number, cvv, name, zip_code):
-        verifications[token]["status"] = "verified"
-        return jsonify({"status": "verified", "token": token}), 200
-    
-    verifications[token]["status"] = "invalid"
-    return jsonify({
-        "status": "invalid",
-        "message": "Invalid card info. Try again.",
-        "token": token
-    }), 400
-
-
-@payment_bp.route("/confirm", methods=["POST"])
-def confirm_payment():
-    """Confirm payment if credentials verified."""
-    data = request.get_json() or {}
-    token = data.get("token")
-    item_id = data.get("item_id")
-    amount = data.get("amount")
-    buyer = data.get("buyer")
-
-    if not all([token, item_id, amount, buyer]):
-        return jsonify({"error": "Missing required fields"}), 400
-
-    session = verifications.get(token)
-    if not session or session["status"] != "verified":
-        return jsonify({"error": "Payment not verified"}), 400
-
-    order_id = len(orders) + 1
-    confirmation_code = f"CONFIRM-{order_id:04}"
-    orders.append({
-        "order_id": order_id,
-        "item_id": item_id,
-        "amount": amount,
-        "buyer": buyer,
-        "confirmation_code": confirmation_code
-    })
+    # Optional: insert or update payment method for user
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO payments (user_id, payment_method_id, card_last4, expiry_date, verified)
+        VALUES (?, ?, ?, ?, ?)
+    """, (data["userId"], data["paymentMethodId"], card[-4:], data["expiryDate"], 1))
+    conn.commit()
+    conn.close()
 
     return jsonify({
         "status": "success",
-        "confirmation_code": confirmation_code
+        "data": {
+            "valid": True,
+            "paymentMethodId": data["paymentMethodId"]
+        }
     }), 200
 
 
-@payment_bp.route("/history", methods=["GET"])
-def get_history():
-    """Return all completed mock orders."""
-    return jsonify({"orders": orders}), 200
+@payment_bp.route("/purchase", methods=["POST"])
+def create_purchase():
+    """
+    Record a new purchase transaction once payment is validated.
+    ---
+    tags:
+      - Payment
+    requestBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              itemId: {type: integer}
+              userId: {type: integer}
+              paymentMethodId: {type: string}
+              amount: {type: number}
+    responses:
+      201:
+        description: Purchase created successfully.
+      400:
+        description: Invalid or unverified payment.
+    """
+    data = request.get_json() or {}
+
+    if not all(k in data for k in ("itemId", "userId", "paymentMethodId", "amount")):
+        return jsonify({"status": "error", "message": "Missing required fields"}), 400
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # Verify the payment method
+    cur.execute("""
+        SELECT verified FROM payments
+        WHERE user_id = ? AND payment_method_id = ?
+    """, (data["userId"], data["paymentMethodId"]))
+    record = cur.fetchone()
+
+    if not record or record["verified"] != 1:
+        conn.close()
+        return jsonify({"status": "error", "message": "Payment not verified"}), 400
+
+    # Create new transaction
+    cur.execute("""
+        INSERT INTO transactions (item_id, buyer_id, amount, status, purchased_at)
+        VALUES (?, ?, ?, ?, ?)
+    """, (
+        data["itemId"], data["userId"], data["amount"], "unshipped",
+        datetime.now().isoformat()
+    ))
+    conn.commit()
+    transaction_id = cur.lastrowid
+    conn.close()
+
+    return jsonify({
+        "status": "success",
+        "data": {
+            "transactionId": transaction_id,
+            "itemId": data["itemId"],
+            "status": "unshipped",
+            "purchasedAt": datetime.now().isoformat()
+        }
+    }), 201
+
+
+@payment_bp.route("/history/<int:user_id>", methods=["GET"])
+def get_payment_history(user_id):
+    """Retrieve all transactions for a specific user."""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT transaction_id, item_id, amount, status, purchased_at
+        FROM transactions WHERE buyer_id = ?
+    """, (user_id,))
+    rows = [dict(row) for row in cur.fetchall()]
+    conn.close()
+
+    return jsonify({"status": "success", "transactions": rows}), 200
+
+
+@payment_bp.route("/refund/<int:transaction_id>", methods=["PUT"])
+def refund_transaction(transaction_id):
+    """Handle refund requests for transactions."""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT * FROM transactions WHERE transaction_id = ?
+    """, (transaction_id,))
+    row = cur.fetchone()
+
+    if not row:
+        conn.close()
+        return jsonify({"status": "error", "message": "Transaction not found"}), 404
+
+    cur.execute("""
+        UPDATE transactions SET status = ? WHERE transaction_id = ?
+    """, ("refunded", transaction_id))
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "status": "success",
+        "data": {
+            "transactionId": transaction_id,
+            "status": "refunded",
+            "refundedAt": datetime.now().isoformat()
+        }
+    }), 200

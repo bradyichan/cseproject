@@ -1,4 +1,7 @@
 #Requirements!
 Flask
-flask_cors
+flask
+flask-cors
 flasgger
+pytest
+pylint

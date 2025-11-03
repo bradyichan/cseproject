@@ -9,15 +9,16 @@ Date: 2025-10-27
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flasgger import Swagger
+from backend.db.database import init_db
 
 # Import all route blueprints
-import users
+from .users import users_bp
 #from users import users_bp
-from items import items_bp
-from search import search_bp
-from bidding import bidding_bp
-from payment import payment_bp
-from messaging import messaging_bp
+from .items import items_bp
+from .search import search_bp
+from .bidding import bidding_bp
+from .payment import payment_bp
+from .messaging import messaging_bp
 
 # Initialize Flask
 app = Flask(__name__)
@@ -25,7 +26,7 @@ CORS(app)
 Swagger(app)
 
 # Register blueprints
-app.register_blueprint(users.users_bp)
+app.register_blueprint(users_bp)
 app.register_blueprint(items_bp)
 app.register_blueprint(search_bp)
 app.register_blueprint(bidding_bp)
@@ -48,6 +49,6 @@ def home():
         ]
     }), 200
 
-
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0")
+    init_db()
+    app.run(host="0.0.0.0", debug=True)
