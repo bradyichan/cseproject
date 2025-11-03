@@ -1,69 +1,120 @@
 """
 Module: messaging.py
-Description: Provides basic message send, receive, and conversation endpoints
-to simulate user communication within the Marketplace app.
-Author: Team XX - CSE 2102
-Date: 2025-10-27
+Description: Manages messaging between users in the Marketplace API.
+Implements send, retrieve, and delete functionality using SQLite.
+Author: Team 22 - CSE 2102
+Date: 2025-11-03
 """
+
 from datetime import datetime
 from flask import Blueprint, jsonify, request
+import sqlite3
+import os
 
-messaging_bp = Blueprint("messaging", __name__, url_prefix="/messages")
+messaging_bp = Blueprint("messaging", __name__, url_prefix="/messaging")
 
-# Mock in-memory data
-# conversations = { "chat_id": [ {sender, receiver, message, timestamp}, ... ] }
-conversations = {}
-
-
-@messaging_bp.route("/", methods=["GET"])
-def get_all_conversations():
-    """Return list of all chat IDs (used when user opens messages menu)."""
-    return jsonify({"chats": list(conversations.keys())}), 200
+DB_PATH = os.path.join(os.path.dirname(__file__), "db", "marketplace.db")
 
 
-@messaging_bp.route("/<chat_id>", methods=["GET"])
-def get_conversation(chat_id):
-    """Return entire conversation history for given chat ID."""
-    if chat_id not in conversations:
-        return jsonify({"error": "Chat not found"}), 404
-    return jsonify({
-        "chat_id": chat_id,
-        "messages": conversations[chat_id]
-    }), 200
+def get_db_connection():
+    """Return SQLite connection."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
-@messaging_bp.route("/<chat_id>/send", methods=["POST"])
-def send_message(chat_id):
-    """Send a new message and append to the chat."""
+@messaging_bp.route("/send", methods=["POST"])
+def send_message():
+    """
+    Send a message between users.
+    Expects JSON: conversation_id, sender_id, receiver_id, content
+    """
     data = request.get_json() or {}
-    sender = data.get("sender")
-    receiver = data.get("receiver")
-    message = data.get("message")
+    required = ["conversation_id", "sender_id", "receiver_id", "content"]
 
-    if not all([sender, receiver, message]):
-        return jsonify({"error": "Missing sender, receiver, or message"}), 400
+    if not all(f in data for f in required):
+        return jsonify({"status": "error", "message": "Missing required fields"}), 400
 
-    new_msg = {
-        "sender": sender,
-        "receiver": receiver,
-        "message": message,
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }
-
-    if chat_id not in conversations:
-        conversations[chat_id] = []
-    conversations[chat_id].append(new_msg)
+    timestamp = datetime.now().isoformat()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO messages (conversation_id, sender_id, receiver_id, content, timestamp)
+        VALUES (?, ?, ?, ?, ?)
+    """, (data["conversation_id"], data["sender_id"], data["receiver_id"], data["content"], timestamp))
+    conn.commit()
+    msg_id = cursor.lastrowid
+    conn.close()
 
     return jsonify({
-        "status": "sent",
-        "chat_id": chat_id,
-        "message": new_msg
+        "status": "success",
+        "data": {
+            "message_id": msg_id,
+            "conversation_id": data["conversation_id"],
+            "sender_id": data["sender_id"],
+            "receiver_id": data["receiver_id"],
+            "content": data["content"],
+            "timestamp": timestamp
+        }
     }), 201
 
 
-@messaging_bp.route("/<chat_id>/latest", methods=["GET"])
-def get_latest_message(chat_id):
-    """Return the most recent message in a conversation."""
-    if chat_id not in conversations or not conversations[chat_id]:
-        return jsonify({"error": "No messages found"}), 404
-    return jsonify(conversations[chat_id][-1]), 200
+@messaging_bp.route("/conversation/<string:conversation_id>", methods=["GET"])
+def get_conversation(conversation_id):
+    """Retrieve all messages in a specific conversation (oldest → newest)."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id AS message_id, sender_id, receiver_id, content, timestamp
+        FROM messages
+        WHERE conversation_id = ?
+        ORDER BY timestamp ASC
+    """, (conversation_id,))
+    rows = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+
+    if not rows:
+        return jsonify({"status": "error", "message": "No messages found"}), 404
+
+    return jsonify({"status": "success", "data": {"conversation": rows}}), 200
+
+
+@messaging_bp.route("/user/<int:user_id>", methods=["GET"])
+def get_user_conversations(user_id):
+    """
+    Retrieve all unique conversations a user is part of.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT DISTINCT conversation_id
+        FROM messages
+        WHERE sender_id = ? OR receiver_id = ?
+        ORDER BY conversation_id
+    """, (user_id, user_id))
+    convos = [row["conversation_id"] for row in cursor.fetchall()]
+    conn.close()
+
+    return jsonify({
+        "status": "success",
+        "data": {"conversations": convos}
+    }), 200
+
+
+@messaging_bp.route("/delete/<int:message_id>", methods=["DELETE"])
+def delete_message(message_id):
+    """Delete a specific message by its ID."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM messages WHERE id = ?", (message_id,))
+    conn.commit()
+    deleted = cursor.rowcount
+    conn.close()
+
+    if deleted == 0:
+        return jsonify({"status": "error", "message": "Message not found"}), 404
+
+    return jsonify({
+        "status": "success",
+        "message": f"Message {message_id} deleted"
+    }), 200

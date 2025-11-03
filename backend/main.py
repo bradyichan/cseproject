@@ -9,6 +9,7 @@ Date: 2025-10-27
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flasgger import Swagger
+from backend.db.database import init_db
 
 # Import all route blueprints
 from .users import users_bp
@@ -48,6 +49,6 @@ def home():
         ]
     }), 200
 
-
 if __name__ == "__main__":
-    app.run(debug=True)
+    init_db()
+    app.run(host="0.0.0.0", port=5000, debug=True)
