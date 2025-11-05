@@ -5,11 +5,10 @@ Marketplace API using SQLite for persistence.
 Author: Team 22 - CSE 2102
 Date: 2025-11-03
 """
-
-from datetime import datetime
-from flask import Blueprint, jsonify, request
 import sqlite3
 import os
+from datetime import datetime
+from flask import Blueprint, jsonify, request
 
 bidding_bp = Blueprint("bidding", __name__, url_prefix="/bidding")
 
