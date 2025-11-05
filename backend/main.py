@@ -23,7 +23,7 @@ from .messaging import messaging_bp
 # Initialize Flask
 app = Flask(__name__)
 CORS(app)
-Swagger(app)
+swagger = Swagger(app)
 
 # Register blueprints
 app.register_blueprint(users_bp)
@@ -51,4 +51,4 @@ def home():
 
 if __name__ == "__main__":
     init_db()
-    app.run(host="0.0.0.0", debug=True)
+    app.run(host="0.0.0.0", port=5001, debug=True)

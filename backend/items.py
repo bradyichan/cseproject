@@ -23,9 +23,51 @@ def get_db_connection():
     return conn
 
 
+# ---------------------------------------------------------------------
+# POST /items/add
+# ---------------------------------------------------------------------
 @items_bp.route("/add", methods=["POST"])
 def add_item():
-    """Add a new item to the marketplace."""
+    """
+    Add a new item
+    ---
+    tags:
+      - Items
+    summary: Add a new item to the marketplace
+    description: |
+      Create a new item by providing title, description, category, price, location, and seller_id.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [title, description, category, price, location, seller_id]
+            properties:
+              title:
+                type: string
+                example: "Desk Lamp"
+              description:
+                type: string
+                example: "Adjustable LED lamp, great for studying."
+              category:
+                type: string
+                example: "Home"
+              price:
+                type: number
+                example: 25.99
+              location:
+                type: string
+                example: "Storrs, CT"
+              seller_id:
+                type: integer
+                example: 4
+    responses:
+      201:
+        description: Item successfully created
+      400:
+        description: Missing required fields
+    """
     data = request.get_json() or {}
 
     required_fields = ["title", "description", "category", "price", "location", "seller_id"]
@@ -64,9 +106,21 @@ def add_item():
     }), 201
 
 
+# ---------------------------------------------------------------------
+# GET /items/all
+# ---------------------------------------------------------------------
 @items_bp.route("/all", methods=["GET"])
 def get_all_items():
-    """Return all items currently listed."""
+    """
+    Get all items
+    ---
+    tags:
+      - Items
+    summary: Retrieve all items in the marketplace
+    responses:
+      200:
+        description: A list of all items
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -80,9 +134,30 @@ def get_all_items():
     return jsonify({"status": "success", "data": {"items": rows}}), 200
 
 
+# ---------------------------------------------------------------------
+# GET /items/<item_id>
+# ---------------------------------------------------------------------
 @items_bp.route("/<int:item_id>", methods=["GET"])
 def get_item_by_id(item_id):
-    """Retrieve a specific item by its ID."""
+    """
+    Get item by ID
+    ---
+    tags:
+      - Items
+    summary: Retrieve a specific item by its ID
+    parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: The unique ID of the item
+    responses:
+      200:
+        description: Item retrieved successfully
+      404:
+        description: Item not found
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -99,11 +174,43 @@ def get_item_by_id(item_id):
     return jsonify({"status": "success", "data": dict(row)}), 200
 
 
+# ---------------------------------------------------------------------
+# PUT /items/update/<item_id>
+# ---------------------------------------------------------------------
 @items_bp.route("/update/<int:item_id>", methods=["PUT"])
 def update_item(item_id):
-    """Update fields for an existing item."""
+    """
+    Update an item
+    ---
+    tags:
+      - Items
+    summary: Update one or more fields for an existing item
+    parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              title:
+                type: string
+                example: "Updated title"
+              price:
+                type: number
+                example: 99.99
+    responses:
+      200:
+        description: Item updated successfully
+      400:
+        description: Invalid or missing fields
+    """
     data = request.get_json() or {}
-
     allowed = ["title", "description", "category", "price", "location"]
     updates = {k: v for k, v in data.items() if k in allowed}
 
@@ -112,10 +219,8 @@ def update_item(item_id):
 
     conn = get_db_connection()
     cursor = conn.cursor()
-
     set_clause = ", ".join([f"{key} = ?" for key in updates.keys()])
     values = list(updates.values()) + [item_id]
-
     cursor.execute(f"UPDATE items SET {set_clause} WHERE id = ?", values)
     conn.commit()
     conn.close()
@@ -126,9 +231,29 @@ def update_item(item_id):
     }), 200
 
 
+# ---------------------------------------------------------------------
+# DELETE /items/delete/<item_id>
+# ---------------------------------------------------------------------
 @items_bp.route("/delete/<int:item_id>", methods=["DELETE"])
 def delete_item(item_id):
-    """Delete an item listing from the marketplace."""
+    """
+    Delete an item
+    ---
+    tags:
+      - Items
+    summary: Remove an item listing from the marketplace
+    parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    responses:
+      200:
+        description: Item successfully deleted
+      404:
+        description: Item not found
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM items WHERE id = ?", (item_id,))
@@ -145,11 +270,29 @@ def delete_item(item_id):
     }), 200
 
 
+# ---------------------------------------------------------------------
+# GET /items/search
+# ---------------------------------------------------------------------
 @items_bp.route("/search", methods=["GET"])
 def search_items():
     """
-    Search for items by title or category.
-    Example: /items/search?query=phone
+    Search for items
+    ---
+    tags:
+      - Items
+    summary: Search for items by title or category
+    parameters:
+      - name: query
+        in: query
+        required: true
+        schema:
+          type: string
+        description: Search term for title or category
+    responses:
+      200:
+        description: Matching items returned
+      400:
+        description: Missing search query
     """
     query = request.args.get("query", "").strip()
     if not query:

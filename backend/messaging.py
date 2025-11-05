@@ -23,11 +23,72 @@ def get_db_connection():
     return conn
 
 
+# ---------------------------------------------------------------------
+# POST /messaging/send
+# ---------------------------------------------------------------------
 @messaging_bp.route("/send", methods=["POST"])
 def send_message():
     """
-    Send a message between users.
-    Expects JSON: conversation_id, sender_id, receiver_id, content
+    Send a message
+    ---
+    tags:
+      - Messaging
+    summary: Send a new message between users
+    description: Create a message in a specific conversation between two users.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [conversation_id, sender_id, receiver_id, content]
+            properties:
+              conversation_id:
+                type: string
+                example: "conv_1234"
+              sender_id:
+                type: integer
+                example: 2
+              receiver_id:
+                type: integer
+                example: 7
+              content:
+                type: string
+                example: "Hey, is this still available?"
+    responses:
+      201:
+        description: Message sent successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  example: success
+                data:
+                  type: object
+                  properties:
+                    message_id:
+                      type: integer
+                      example: 45
+                    conversation_id:
+                      type: string
+                      example: "conv_1234"
+                    sender_id:
+                      type: integer
+                      example: 2
+                    receiver_id:
+                      type: integer
+                      example: 7
+                    content:
+                      type: string
+                      example: "Hey, is this still available?"
+                    timestamp:
+                      type: string
+                      example: "2025-11-03T18:00:00"
+      400:
+        description: Missing required fields
     """
     data = request.get_json() or {}
     required = ["conversation_id", "sender_id", "receiver_id", "content"]
@@ -59,9 +120,61 @@ def send_message():
     }), 201
 
 
+# ---------------------------------------------------------------------
+# GET /messaging/conversation/<conversation_id>
+# ---------------------------------------------------------------------
 @messaging_bp.route("/conversation/<string:conversation_id>", methods=["GET"])
 def get_conversation(conversation_id):
-    """Retrieve all messages in a specific conversation (oldest → newest)."""
+    """
+    Get conversation messages
+    ---
+    tags:
+      - Messaging
+    summary: Retrieve all messages in a specific conversation
+    parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: The unique ID of the conversation
+    responses:
+      200:
+        description: Messages retrieved successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  example: success
+                data:
+                  type: object
+                  properties:
+                    conversation:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          message_id:
+                            type: integer
+                            example: 101
+                          sender_id:
+                            type: integer
+                            example: 2
+                          receiver_id:
+                            type: integer
+                            example: 7
+                          content:
+                            type: string
+                            example: "Sure, it's available!"
+                          timestamp:
+                            type: string
+                            example: "2025-11-03T19:15:00"
+      404:
+        description: No messages found
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -79,10 +192,43 @@ def get_conversation(conversation_id):
     return jsonify({"status": "success", "data": {"conversation": rows}}), 200
 
 
+# ---------------------------------------------------------------------
+# GET /messaging/user/<user_id>
+# ---------------------------------------------------------------------
 @messaging_bp.route("/user/<int:user_id>", methods=["GET"])
 def get_user_conversations(user_id):
     """
-    Retrieve all unique conversations a user is part of.
+    Get user's conversations
+    ---
+    tags:
+      - Messaging
+    summary: Retrieve all conversations a user is part of
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: The user ID
+    responses:
+      200:
+        description: List of conversation IDs
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  example: success
+                data:
+                  type: object
+                  properties:
+                    conversations:
+                      type: array
+                      items:
+                        type: string
+                        example: "conv_5678"
     """
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -101,9 +247,29 @@ def get_user_conversations(user_id):
     }), 200
 
 
+# ---------------------------------------------------------------------
+# DELETE /messaging/delete/<message_id>
+# ---------------------------------------------------------------------
 @messaging_bp.route("/delete/<int:message_id>", methods=["DELETE"])
 def delete_message(message_id):
-    """Delete a specific message by its ID."""
+    """
+    Delete a message
+    ---
+    tags:
+      - Messaging
+    summary: Delete a specific message by its ID
+    parameters:
+      - name: message_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    responses:
+      200:
+        description: Message deleted successfully
+      404:
+        description: Message not found
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM messages WHERE id = ?", (message_id,))

@@ -13,35 +13,47 @@ from backend.db.database import get_connection
 users_bp = Blueprint("users", __name__, url_prefix="/users")
 
 
+# ---------------------------------------------------------------------
+# POST /users/register
+# ---------------------------------------------------------------------
 @users_bp.route("/register", methods=["POST"])
 def register_user():
     """
-    Register a new user.
+    Register a new user
     ---
-    tags:
-      - Users
-    parameters:
-      - name: body
-        in: body
-        required: true
-        schema:
-          id: UserRegister
-          required:
-            - username
-            - email
-            - password
-          properties:
-            username:
-              type: string
-            email:
-              type: string
-            password:
-              type: string
+    tags: [Users]
+    summary: Create a new user account
+    description: Create a user with a unique username and email.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [username, email, password]
+            properties:
+              username: {type: string, example: "sam_mason"}
+              email: {type: string, example: "sam@example.com"}
+              password: {type: string, example: "hunter2"}
     responses:
       201:
         description: User successfully registered
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: {type: string, example: success}
+                data:
+                  type: object
+                  properties:
+                    userId: {type: integer, example: 12}
+                    username: {type: string, example: "sam_mason"}
+                    email: {type: string, example: "sam@example.com"}
       400:
-        description: Missing or invalid fields
+        description: Missing fields or user already exists
+      500:
+        description: Database error
     """
     data = request.get_json() or {}
     username = data.get("username")
@@ -77,11 +89,7 @@ def register_user():
         user_id = cursor.lastrowid
         return jsonify({
             "status": "success",
-            "data": {
-                "userId": user_id,
-                "username": username,
-                "email": email
-            }
+            "data": {"userId": user_id, "username": username, "email": email}
         }), 201
     except Exception as err:
         return jsonify({
@@ -92,9 +100,48 @@ def register_user():
         conn.close()
 
 
+# ---------------------------------------------------------------------
+# POST /users/login
+# ---------------------------------------------------------------------
 @users_bp.route("/login", methods=["POST"])
 def login_user():
-    """Log in an existing user."""
+    """
+    Log in a user
+    ---
+    tags: [Users]
+    summary: Authenticate a user with username and password
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [username, password]
+            properties:
+              username: {type: string, example: "sam_mason"}
+              password: {type: string, example: "hunter2"}
+    responses:
+      200:
+        description: Login successful
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: {type: string, example: success}
+                data:
+                  type: object
+                  properties:
+                    userId: {type: integer, example: 12}
+                    username: {type: string, example: "sam_mason"}
+                    email: {type: string, example: "sam@example.com"}
+      400:
+        description: Missing fields
+      401:
+        description: Incorrect password
+      404:
+        description: User not found
+    """
     data = request.get_json() or {}
     username = data.get("username")
     password = data.get("password")
@@ -127,17 +174,44 @@ def login_user():
 
     return jsonify({
         "status": "success",
-        "data": {
-            "userId": row["id"],
-            "username": username,
-            "email": row["email"]
-        }
+        "data": {"userId": row["id"], "username": username, "email": row["email"]}
     }), 200
 
 
+# ---------------------------------------------------------------------
+# GET /users/<user_id>
+# ---------------------------------------------------------------------
 @users_bp.route("/<int:user_id>", methods=["GET"])
 def get_user_profile(user_id):
-    """Retrieve one user's profile by ID."""
+    """
+    Get user profile by ID
+    ---
+    tags: [Users]
+    summary: Retrieve one user's profile by ID
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema: {type: integer}
+    responses:
+      200:
+        description: User profile returned
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: {type: string, example: success}
+                data:
+                  type: object
+                  properties:
+                    userId: {type: integer, example: 12}
+                    username: {type: string, example: "sam_mason"}
+                    email: {type: string, example: "sam@example.com"}
+                    joined: {type: string, example: "2025-10-01"}
+      404:
+        description: User not found
+    """
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT id, username, email, joined FROM users WHERE id = ?", (user_id,))
@@ -161,9 +235,38 @@ def get_user_profile(user_id):
     }), 200
 
 
+# ---------------------------------------------------------------------
+# GET /users/all
+# ---------------------------------------------------------------------
 @users_bp.route("/all", methods=["GET"])
 def get_all_users():
-    """Return all registered users."""
+    """
+    Get all users
+    ---
+    tags: [Users]
+    summary: Return all registered users
+    responses:
+      200:
+        description: List of users
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: {type: string, example: success}
+                data:
+                  type: object
+                  properties:
+                    users:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          userId: {type: integer, example: 12}
+                          username: {type: string, example: "sam_mason"}
+                          email: {type: string, example: "sam@example.com"}
+                          joined: {type: string, example: "2025-10-01"}
+    """
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT id, username, email, joined FROM users")
@@ -175,7 +278,4 @@ def get_all_users():
          "email": row["email"], "joined": row["joined"]}
         for row in rows
     ]
-    return jsonify({
-        "status": "success",
-        "data": {"users": users_list}
-    }), 200
+    return jsonify({"status": "success", "data": {"users": users_list}}), 200
