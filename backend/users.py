@@ -6,7 +6,6 @@ Author: Team 22 - CSE 2102
 Date: 2025-11-02
 """
 
-import sqlite3
 from datetime import datetime
 from flask import Blueprint, jsonify, request
 from backend.db.database import get_connection

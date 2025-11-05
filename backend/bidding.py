@@ -349,5 +349,6 @@ def user_bid_history(username):
                         type: string
                         example: "2025-11-04T18:00:00"
     """
+    bids = []
     user_bids = [b for b in bids if b["bidder"] == username]
     return jsonify({"username": username, "bids": user_bids}), 200

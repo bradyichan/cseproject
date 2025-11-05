@@ -6,10 +6,10 @@ Author: Team 22 - CSE 2102
 Date: 2025-11-03
 """
 
+import os
+import sqlite3
 from datetime import datetime
 from flask import Blueprint, jsonify, request
-import sqlite3
-import os
 
 # Blueprint
 payment_bp = Blueprint("payment", __name__, url_prefix="/payment")
@@ -37,7 +37,8 @@ def validate_payment():
       - Payment
     summary: Validate a user's payment method
     description: |
-      Checks if provided card and CVV format are valid, and stores the payment method in the database.
+      Checks if provided card and CVV format are valid,
+      and stores the payment method in the database.
     requestBody:
       required: true
       content:
@@ -93,7 +94,8 @@ def validate_payment():
     if len(card) not in (15, 16) or not cvv.isdigit() or len(cvv) not in (3, 4):
         return jsonify({
             "status": "error",
-            "error": {"code": "INVALID_PAYMENT_METHOD", "message": "Payment credentials are invalid"}
+            "error": {"code": "INVALID_PAYMENT_METHOD", "message":
+                      "Payment credentials are invalid"}
         }), 400
 
     conn = get_db_connection()
