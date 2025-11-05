@@ -1,10 +1,10 @@
 #DOCKERFILE!
 #These are the commands I used:
 #To build:
-# docker build -t Team22swapandsell .
+# docker build -t team22swapandsell .
 
 #To run:
-# docker run -p 6767:6767 Team22swapandsell
+# docker run -p 6767:6767 team22swapandsell
 
 #Use python
 FROM python:3.9-slim
