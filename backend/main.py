@@ -9,16 +9,17 @@ Date: 2025-10-27
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flasgger import Swagger
-from backend.db.database import init_db
+#from backend.db.database import init_db
+from db.database import init_db
 
 # Import all route blueprints
-from .users import users_bp
-#from users import users_bp
-from .items import items_bp
-from .search import search_bp
-from .bidding import bidding_bp
-from .payment import payment_bp
-from .messaging import messaging_bp
+#from .users import users_bp
+from users import users_bp
+from items import items_bp
+from search import search_bp
+from bidding import bidding_bp
+from payment import payment_bp
+from messaging import messaging_bp
 
 # Initialize Flask
 app = Flask(__name__)
@@ -51,4 +52,4 @@ def home():
 
 if __name__ == "__main__":
     init_db()
-    app.run(host="0.0.0.0", port=5001, debug=True)
+    app.run(host="0.0.0.0", port=6767, debug=True)

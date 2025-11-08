@@ -8,7 +8,7 @@ Date: 2025-11-02
 
 from datetime import datetime
 from flask import Blueprint, jsonify, request
-from backend.db.database import get_connection
+from db.database import get_connection
 
 users_bp = Blueprint("users", __name__, url_prefix="/users")
 
