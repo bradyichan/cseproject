@@ -6,9 +6,9 @@ Author: Team 22 - CSE 2102
 Date: 2025-11-03
 """
 
-from flask import Blueprint, jsonify, request
 import sqlite3
 import os
+from flask import Blueprint, jsonify, request
 
 search_bp = Blueprint("search", __name__, url_prefix="/search")
 
@@ -21,11 +21,72 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+
+# ---------------------------------------------------------------------
+# GET /search/
+# ---------------------------------------------------------------------
 @search_bp.route("/", methods=["GET"])
 def global_search():
     """
-    Perform a global search for a keyword across items, users, and bids.
-    Example: /search/?query=camera
+    Global search
+    ---
+    tags:
+      - Search
+    summary: Search across items, users, and bids
+    description: |
+      Perform a global keyword search that looks across all key database tables:
+      - **Items** → title, description, category  
+      - **Users** → username, email  
+      - **Bids** → amount, status
+    parameters:
+      - name: query
+        in: query
+        required: true
+        schema:
+          type: string
+        description: Keyword to search for (matches partial text)
+        example: camera
+    responses:
+      200:
+        description: Combined search results returned successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  example: success
+                data:
+                  type: object
+                  properties:
+                    items:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          item_id: {type: integer, example: 5}
+                          title: {type: string, example: "Canon DSLR Camera"}
+                          price: {type: number, example: 499.99}
+                    users:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          user_id: {type: integer, example: 3}
+                          username: {type: string, example: "john_doe"}
+                          email: {type: string, example: "john@example.com"}
+                    bids:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          bid_id: {type: integer, example: 15}
+                          item_id: {type: integer, example: 5}
+                          amount: {type: number, example: 325.00}
+                          status: {type: string, example: pending}
+      400:
+        description: Missing search query
     """
     query = request.args.get("query", "").strip()
     if not query:

@@ -1,0 +1,85 @@
+#root {
+  max-width: 1280px;
+  text-align: center;
+
+  background-color: #E4F69E;
+
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;     /* horizontal center */
+  height: 100vh;
+  width: 100vw;
+  margin: 0; 
+  padding: 0; 
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* vertical centering */
+  align-items: center;    /* horizontal centering */
+  height: 100vh;          /* full viewport height */
+  text-align: center;
+}
+.back2menu { /* button that takes you to the main screen (MAKE SURE THIS IS ON EVERY PAGE!!!!)*/
+  position: fixed;
+  top: 50px;
+  left: 50px; 
+  background-color: green;
+  color: white;
+  border-color: #ccc;
+  z-index: 1000; /*puts on top of all other items*/
+  width: 100px;
+  height: 75px;
+
+  font-size: 3em;
+  text-align: center;
+  align-items: center;
+}
+
+.profileicon { /* button that take you to your profile (MAKE SURE THIS IS ON EVERY PAGE!!!!)*/
+  position: fixed;
+  top: 50px;
+  right: 50px; 
+  border-radius: 50%;
+  z-index: 1000; /*puts on top of all other items*/
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}

@@ -5,11 +5,10 @@ Marketplace API using SQLite for persistence.
 Author: Team 22 - CSE 2102
 Date: 2025-11-03
 """
-
-from datetime import datetime
-from flask import Blueprint, jsonify, request
 import sqlite3
 import os
+from datetime import datetime
+from flask import Blueprint, jsonify, request
 
 bidding_bp = Blueprint("bidding", __name__, url_prefix="/bidding")
 
@@ -23,14 +22,73 @@ def get_db_connection():
     return conn
 
 
+# ---------------------------------------------------------------------
+#  POST /bidding/place
+# ---------------------------------------------------------------------
 @bidding_bp.route("/place", methods=["POST"])
 def place_bid():
     """
-    Place a new bid for a given item.
-    Expects JSON with: item_id, bidder_id, amount
+    Place a new bid
+    ---
+    tags:
+      - Bidding
+    summary: Submit a new bid for a given item
+    description: |
+      Create a new bid by providing `item_id`, `bidder_id`, and `amount`.
+      The bid will be recorded in the database with a `pending` status until accepted.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [item_id, bidder_id, amount]
+            properties:
+              item_id:
+                type: integer
+                example: 12
+              bidder_id:
+                type: integer
+                example: 5
+              amount:
+                type: number
+                example: 250.50
+    responses:
+      201:
+        description: Bid successfully created
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  example: success
+                data:
+                  type: object
+                  properties:
+                    bid_id:
+                      type: integer
+                      example: 44
+                    item_id:
+                      type: integer
+                      example: 12
+                    bidder_id:
+                      type: integer
+                      example: 5
+                    amount:
+                      type: number
+                      example: 250.5
+                    status:
+                      type: string
+                      example: pending
+                    timestamp:
+                      type: string
+                      example: "2025-11-03T19:00:00"
+      400:
+        description: Missing required fields
     """
     data = request.get_json() or {}
-
     required_fields = ["item_id", "bidder_id", "amount"]
     if not all(f in data for f in required_fields):
         return jsonify({
@@ -38,7 +96,6 @@ def place_bid():
             "message": "Missing required fields"
         }), 400
 
-    # Insert bid into DB
     conn = get_db_connection()
     cursor = conn.cursor()
     timestamp = datetime.now().isoformat()
@@ -65,9 +122,59 @@ def place_bid():
     }), 201
 
 
+# ---------------------------------------------------------------------
+#  GET /bidding/item/<item_id>
+# ---------------------------------------------------------------------
 @bidding_bp.route("/item/<int:item_id>", methods=["GET"])
 def get_bids_for_item(item_id):
-    """Retrieve all bids for a specific item."""
+    """
+    Get bids for an item
+    ---
+    tags:
+      - Bidding
+    summary: Retrieve all bids for a specific item
+    parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: The ID of the item to retrieve bids for
+    responses:
+      200:
+        description: List of bids for the specified item
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  example: success
+                data:
+                  type: object
+                  properties:
+                    bids:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          bid_id:
+                            type: integer
+                            example: 3
+                          bidder_id:
+                            type: integer
+                            example: 9
+                          amount:
+                            type: number
+                            example: 125.0
+                          status:
+                            type: string
+                            example: pending
+                          timestamp:
+                            type: string
+                            example: "2025-11-04T12:30:00"
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -85,15 +192,53 @@ def get_bids_for_item(item_id):
     }), 200
 
 
+# ---------------------------------------------------------------------
+#  PUT /bidding/accept/<bid_id>
+# ---------------------------------------------------------------------
 @bidding_bp.route("/accept/<int:bid_id>", methods=["PUT"])
 def accept_bid(bid_id):
     """
-    Accept a bid, mark others for the same item as rejected.
+    Accept a bid
+    ---
+    tags:
+      - Bidding
+    summary: Accept a bid and reject others for the same item
+    parameters:
+      - name: bid_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: The ID of the bid to accept
+    responses:
+      200:
+        description: Bid accepted successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  example: success
+                data:
+                  type: object
+                  properties:
+                    bid_id:
+                      type: integer
+                      example: 7
+                    item_id:
+                      type: integer
+                      example: 12
+                    status:
+                      type: string
+                      example: accepted
+      404:
+        description: Bid not found
     """
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Find which item this bid belongs to
     cursor.execute("SELECT item_id FROM bids WHERE id = ?", (bid_id,))
     row = cursor.fetchone()
     if not row:
@@ -101,10 +246,7 @@ def accept_bid(bid_id):
         return jsonify({"status": "error", "message": "Bid not found"}), 404
 
     item_id = row["item_id"]
-
-    # Accept this bid
     cursor.execute("UPDATE bids SET status = 'accepted' WHERE id = ?", (bid_id,))
-    # Reject all others
     cursor.execute("""
         UPDATE bids SET status = 'rejected'
         WHERE item_id = ? AND id != ?
@@ -118,9 +260,30 @@ def accept_bid(bid_id):
     }), 200
 
 
+# ---------------------------------------------------------------------
+#  GET /bidding/highest/<item_id>
+# ---------------------------------------------------------------------
 @bidding_bp.route("/highest/<int:item_id>", methods=["GET"])
 def get_highest_bid(item_id):
-    """Return the highest bid for a specific item."""
+    """
+    Get highest bid
+    ---
+    tags:
+      - Bidding
+    summary: Retrieve the highest bid for a specific item
+    parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: The ID of the item
+    responses:
+      200:
+        description: Highest bid for this item
+      404:
+        description: No bids found
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -141,8 +304,51 @@ def get_highest_bid(item_id):
         "data": dict(row)
     }), 200
 
+
+# ---------------------------------------------------------------------
+#  GET /bidding/history/<username>
+# ---------------------------------------------------------------------
 @bidding_bp.route("/history/<string:username>", methods=["GET"])
 def user_bid_history(username):
-    """Return all bids placed by a given user."""
+    """
+    User bid history
+    ---
+    tags:
+      - Bidding
+    summary: Retrieve all bids placed by a specific user
+    parameters:
+      - name: username
+        in: path
+        required: true
+        schema:
+          type: string
+        description: The username to retrieve bid history for
+    responses:
+      200:
+        description: A list of bids made by the user
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  example: "sam_mason"
+                bids:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      item_id:
+                        type: integer
+                        example: 10
+                      amount:
+                        type: number
+                        example: 175.25
+                      timestamp:
+                        type: string
+                        example: "2025-11-04T18:00:00"
+    """
+    bids = []
     user_bids = [b for b in bids if b["bidder"] == username]
     return jsonify({"username": username, "bids": user_bids}), 200

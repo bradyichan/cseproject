@@ -6,15 +6,15 @@ Author: Team 22 - CSE 2102
 Date: 2025-11-03
 """
 
+import os
+import sqlite3
 from datetime import datetime
 from flask import Blueprint, jsonify, request
-import sqlite3
-import os
 
 # Blueprint
 payment_bp = Blueprint("payment", __name__, url_prefix="/payment")
 
-# Database path (same as in database.py or main.py)
+# Database path
 DB_PATH = os.path.join(os.path.dirname(__file__), "db", "marketplace.db")
 
 
@@ -25,29 +25,59 @@ def get_db_connection():
     return conn
 
 
+# ---------------------------------------------------------------------
+# POST /payment/validate
+# ---------------------------------------------------------------------
 @payment_bp.route("/validate", methods=["POST"])
 def validate_payment():
     """
-    Validate payment credentials.
+    Validate payment credentials
     ---
     tags:
       - Payment
+    summary: Validate a user's payment method
+    description: |
+      Checks if provided card and CVV format are valid,
+      and stores the payment method in the database.
     requestBody:
+      required: true
       content:
         application/json:
           schema:
             type: object
+            required: [paymentMethodId, userId, cardNumber, cvv, expiryDate]
             properties:
-              paymentMethodId: {type: string}
-              userId: {type: integer}
-              cardNumber: {type: string}
-              cvv: {type: string}
-              expiryDate: {type: string}
+              paymentMethodId:
+                type: string
+                example: "visa_1234"
+              userId:
+                type: integer
+                example: 5
+              cardNumber:
+                type: string
+                example: "4242 4242 4242 4242"
+              cvv:
+                type: string
+                example: "123"
+              expiryDate:
+                type: string
+                example: "12/27"
     responses:
       200:
-        description: Payment method validated successfully.
+        description: Payment method validated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: {type: string, example: success}
+                data:
+                  type: object
+                  properties:
+                    valid: {type: boolean, example: true}
+                    paymentMethodId: {type: string, example: "visa_1234"}
       400:
-        description: Invalid payment credentials.
+        description: Invalid or missing payment credentials
     """
     data = request.get_json() or {}
 
@@ -64,10 +94,10 @@ def validate_payment():
     if len(card) not in (15, 16) or not cvv.isdigit() or len(cvv) not in (3, 4):
         return jsonify({
             "status": "error",
-            "error": {"code": "INVALID_PAYMENT_METHOD", "message": "Payment credentials are invalid"}
+            "error": {"code": "INVALID_PAYMENT_METHOD", "message":
+                      "Payment credentials are invalid"}
         }), 400
 
-    # Optional: insert or update payment method for user
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("""
@@ -86,28 +116,48 @@ def validate_payment():
     }), 200
 
 
+# ---------------------------------------------------------------------
+# POST /payment/purchase
+# ---------------------------------------------------------------------
 @payment_bp.route("/purchase", methods=["POST"])
 def create_purchase():
     """
-    Record a new purchase transaction once payment is validated.
+    Create a purchase transaction
     ---
     tags:
       - Payment
+    summary: Record a new purchase after validation
+    description: Creates a new transaction entry for a validated payment method.
     requestBody:
+      required: true
       content:
         application/json:
           schema:
             type: object
+            required: [itemId, userId, paymentMethodId, amount]
             properties:
-              itemId: {type: integer}
-              userId: {type: integer}
-              paymentMethodId: {type: string}
-              amount: {type: number}
+              itemId: {type: integer, example: 12}
+              userId: {type: integer, example: 5}
+              paymentMethodId: {type: string, example: "visa_1234"}
+              amount: {type: number, example: 199.99}
     responses:
       201:
-        description: Purchase created successfully.
+        description: Purchase successfully recorded
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: {type: string, example: success}
+                data:
+                  type: object
+                  properties:
+                    transactionId: {type: integer, example: 42}
+                    itemId: {type: integer, example: 12}
+                    status: {type: string, example: unshipped}
+                    purchasedAt: {type: string, example: "2025-11-03T18:30:00"}
       400:
-        description: Invalid or unverified payment.
+        description: Payment method not verified or missing fields
     """
     data = request.get_json() or {}
 
@@ -117,7 +167,6 @@ def create_purchase():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Verify the payment method
     cur.execute("""
         SELECT verified FROM payments
         WHERE user_id = ? AND payment_method_id = ?
@@ -128,7 +177,6 @@ def create_purchase():
         conn.close()
         return jsonify({"status": "error", "message": "Payment not verified"}), 400
 
-    # Create new transaction
     cur.execute("""
         INSERT INTO transactions (item_id, buyer_id, amount, status, purchased_at)
         VALUES (?, ?, ?, ?, ?)
@@ -151,9 +199,44 @@ def create_purchase():
     }), 201
 
 
+# ---------------------------------------------------------------------
+# GET /payment/history/<user_id>
+# ---------------------------------------------------------------------
 @payment_bp.route("/history/<int:user_id>", methods=["GET"])
 def get_payment_history(user_id):
-    """Retrieve all transactions for a specific user."""
+    """
+    Get payment history
+    ---
+    tags:
+      - Payment
+    summary: Retrieve all past transactions for a specific user
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: The user's ID
+    responses:
+      200:
+        description: List of transactions retrieved successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: {type: string, example: success}
+                transactions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      transaction_id: {type: integer, example: 44}
+                      item_id: {type: integer, example: 12}
+                      amount: {type: number, example: 89.99}
+                      status: {type: string, example: shipped}
+                      purchased_at: {type: string, example: "2025-11-02T14:00:00"}
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("""
@@ -166,9 +249,41 @@ def get_payment_history(user_id):
     return jsonify({"status": "success", "transactions": rows}), 200
 
 
+# ---------------------------------------------------------------------
+# PUT /payment/refund/<transaction_id>
+# ---------------------------------------------------------------------
 @payment_bp.route("/refund/<int:transaction_id>", methods=["PUT"])
 def refund_transaction(transaction_id):
-    """Handle refund requests for transactions."""
+    """
+    Refund a transaction
+    ---
+    tags:
+      - Payment
+    summary: Mark a transaction as refunded
+    parameters:
+      - name: transaction_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    responses:
+      200:
+        description: Transaction successfully refunded
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: {type: string, example: success}
+                data:
+                  type: object
+                  properties:
+                    transactionId: {type: integer, example: 88}
+                    status: {type: string, example: refunded}
+                    refundedAt: {type: string, example: "2025-11-03T19:00:00"}
+      404:
+        description: Transaction not found
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("""
