@@ -2,7 +2,7 @@
 Module: main.py
 Description: Initializes the Flask application, registers all blueprints,
 and configures Swagger and CORS for the Marketplace API.
-Author: Team XX - CSE 2102
+Author: Team 22 - CSE 2102
 Date: 2025-10-27
 """
 
@@ -23,7 +23,7 @@ from messaging import messaging_bp
 
 # Initialize Flask
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=["http://127.0.0.1:5173"])
 swagger = Swagger(app)
 
 # Register blueprints
