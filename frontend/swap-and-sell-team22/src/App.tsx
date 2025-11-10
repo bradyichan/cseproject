@@ -3,6 +3,7 @@ import ProfileIcon from "./ProfileIcon";
 import Back2menu from "./components/back2menu";
 import { Routes, Route, Link } from "react-router-dom";
 import BuyPage from "./pages/BuyPage";
+import SellPage from "./pages/SellPage";
 
 function App() {
   return (
@@ -81,6 +82,7 @@ function App() {
       />
 
       <Route path="/buy" element={<BuyPage />} />
+      <Route path="/sell" element={<SellPage />} />
     </Routes>
   );
 }

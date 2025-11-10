@@ -1,10 +1,15 @@
 import imgUconn from "../assets/UConn Patch.png";
 import imgChewToy from "../assets/Blue Chew Toy.png";
 import imgTreat from "../assets/Treat.png";
+import { Link } from "react-router-dom";
 
 export default function BuyPage() {
   return (
     <div className="buy-wrapper">
+      <div className="buy-header">
+        <h2>Browse Items</h2>
+        <Link to="/" className="back-home-link">← Back to Home</Link>
+      </div>
 
       {/* SEARCH + FILTER */}
       <div className="search-row">
