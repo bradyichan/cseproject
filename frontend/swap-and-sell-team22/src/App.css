@@ -1,16 +1,9 @@
 #root {
-  max-width: 1280px;
-  text-align: center;
-
   background-color: #E4F69E;
-
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;     /* horizontal center */
-  height: 100vh;
+  min-height: 100vh;
   width: 100vw;
-  margin: 0; 
-  padding: 0; 
+  margin: 0;
+  padding: 0;
 }
 
 .logo {
@@ -27,13 +20,10 @@
 }
 
 .container {
-  display: flex;
-  flex-direction: column;
-  justify-content: center; /* vertical centering */
-  align-items: center;    /* horizontal centering */
-  height: 100vh;          /* full viewport height */
   text-align: center;
+  padding-top: 50px;
 }
+
 .back2menu { /* button that takes you to the main screen (MAKE SURE THIS IS ON EVERY PAGE!!!!)*/
   position: fixed;
   top: 50px;
@@ -82,4 +72,86 @@
 
 .read-the-docs {
   color: #888;
+}
+
+.buy-wrapper {
+  background-color: #E8F8A9;
+  min-height: 100vh;
+  padding: 30px 50px;
+}
+
+/* SEARCH ROW */
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto 30px auto;
+}
+
+.search-bar {
+  flex: 1;
+  background: #dcdcdc;
+  padding: 18px;
+  font-size: 32px;
+  border: 2px solid #005bb5;
+  border-radius: 5px;
+  outline: none;
+}
+
+.filter-button {
+  background: #e87063;
+  padding: 18px 25px;
+  border-radius: 5px;
+  border: none;
+  font-size: 20px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ITEM GRID */
+.items-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 35px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* ITEM CARD */
+.item {
+  background: none;
+  text-align: left;
+}
+
+.item img {
+  width: 100%;
+  height: 300px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.item-info {
+  margin-top: 10px;
+}
+
+.price {
+  margin: 0;
+  font-weight: 700;
+  font-size: 50px;
+  color:#005bb5
+}
+
+.title {
+  margin: 0;
+  font-size: 24px;
+  color:#333;
+  font-weight: 1000;
+}
+
+.state {
+  margin: 0;
+  font-size: 14px;
+  color: #333;
 }
