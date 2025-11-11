@@ -2,46 +2,46 @@ import { useEffect, useState } from "react";
 import ProfileIcon from "../ProfileIcon";
 import "../App.css";
 
-// ✅ Map item titles → image imports
-import BlueChewToyImg from "../assets/items/Blue Chew Toy.png";
-import UConnPatchImg from "../assets/items/UConn Patch.png";
-import LionCostumeImg from "../assets/items/LionCostume.png";
-import StylishLeashImg from "../assets/items/StylishLeash.png";
-import WallArtImg from "../assets/items/WallArt.png";
-import TreatImg from "../assets/items/Treat.png";
-import DogBowlImg from "../assets/items/DogBowl.png";
-import DogCoatImg from "../assets/items/DogCoat.png";
-import FoxToyImg from "../assets/items/FoxToy.png";
-import GroomingBrushImg from "../assets/items/GroomingBrush.png";
-import PeanutTreatImg from "../assets/items/PeanutTreat.png";
-import DeskLampImg from "../assets/items/DeskLamp.png";
+import bluechewtoy from "../assets/items/bluechewtoy.png";
+import desklamp from "../assets/items/desklamp.png";
+import dogwallart from "../assets/items/dogwallart.png";
+import dogwinterjacket from "../assets/items/dogwinterjacket.png";
+import lioncostume from "../assets/items/lioncostume.png";
+import peanutbuttertreats from "../assets/items/peanutbuttertreats.png";
+import softgroomingbrush from "../assets/items/softgroomingbrush.png";
+import squeakyfoxtoy from "../assets/items/squeakyfoxtoy.png";
+import stainlesssteelbowlset from "../assets/items/stainlesssteelbowlset.png";
+import treat from "../assets/items/treat.png";
+import uconnpatch from "../assets/items/uconnpatch.png";
+import stylishleash from "../assets/items/stylishleash.png";
 
-// ✅ MAP: title → image source
 const imageMap: Record<string, string> = {
-  "UConn PD patch": UConnPatchImg,
-  "Blue Chew Toy": BlueChewToyImg,
-  "Treat": TreatImg,
-  "Lion Costume": LionCostumeImg,
-  "Stylish Leash": StylishLeashImg,
-  "Wall Art": WallArtImg,
-  "Dog Bowl": DogBowlImg,
-  "Dog Coat": DogCoatImg,
-  "Fox Toy": FoxToyImg,
-  "Grooming Brush": GroomingBrushImg,
-  "Peanut Treat": PeanutTreatImg,
-  "Desk Lamp": DeskLampImg
+  bluechewtoy,
+  desklamp,
+  dogwallart,
+  dogwinterjacket,
+  lioncostume,
+  peanutbuttertreats,
+  softgroomingbrush,
+  squeakyfoxtoy,
+  stainlesssteelbowlset,
+  treat,
+  uconnpatch,
+  stylishleash
 };
 
+function normalizeTitle(title: string) {
+  return title.trim().replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+}
+
 export default function BuyPage() {
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // ✅ Fetch all items from backend API
   useEffect(() => {
     fetch("http://127.0.0.1:6767/items/all")
       .then((res) => res.json())
       .then((data) => {
-        console.log("API response:", data);
         if (data?.data?.items) {
           setItems(data.data.items);
         }
@@ -49,13 +49,12 @@ export default function BuyPage() {
       .catch((err) => console.error("Fetch error:", err));
   }, []);
 
-  // ✅ Filter items by search
-  const filteredItems = items.filter((item: any) =>
+  const filteredItems = items.filter((item) =>
     item.title.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
-    <div className="buy-wrapper">
+    <div className="buy-wrapper" style={{ padding: "20px" }}>
       <div className="buy-header">
         <h2>Browse Items</h2>
         <a href="/">← Back to Home</a>
@@ -69,16 +68,22 @@ export default function BuyPage() {
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
-
         <button className="filter-button">Filter By..</button>
       </div>
 
       <div className="items-grid">
-        {filteredItems.map((item: any) => {
-          const img = imageMap[item.title] || "/placeholder.png"; // fallback image
+        {filteredItems.map((item) => {
+          const key = normalizeTitle(item.title);
+          const imgSrc = imageMap[key];
+
           return (
-            <div className="item" key={item.item_id}>
-              <img src={img} alt={item.title} className="item-img" />
+            <div className="item-card" key={item.item_id}>
+              {imgSrc ? (
+                <img src={imgSrc} alt={item.title} className="item-img" />
+              ) : (
+                <div className="no-image">No Image</div>
+              )}
+
               <div className="item-info">
                 <p className="price">${item.price}</p>
                 <p className="title">{item.title}</p>
@@ -89,7 +94,10 @@ export default function BuyPage() {
         })}
       </div>
 
-      <ProfileIcon />
+      {/* ✅ Floating Husky Profile Icon */}
+      <div className="floating-husky">
+        <ProfileIcon />
+      </div>
     </div>
   );
 }
