@@ -298,7 +298,7 @@
 
 .floating-husky img {
   width: 140px;  
-  height: 140px; 
+  height: 140px; /* doubled from 70px */
   border-radius: 50%;
   cursor: pointer;
   transition: transform 0.25s ease, box-shadow 0.25s ease;
