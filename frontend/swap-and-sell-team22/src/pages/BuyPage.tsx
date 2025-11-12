@@ -36,8 +36,16 @@ function normalizeTitle(title: string) {
   return title.trim().replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
 }
 
+interface Item {
+  item_id: string;
+  title: string;
+  price: number;
+  location: string;
+  [key: string]: unknown; // allows additional optional fields
+}
+
 export default function BuyPage() {
-  const [items, setItems] = useState<string[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
