@@ -25,12 +25,11 @@ function App() {
               <h1 style={{ color: "white" }}>
                 Swap & Sell: Secondhand Marketplace
               </h1>
-              <Back2menu />
               <ProfileIcon />
+              <Back2menu />
             </div>
 
             <h1 style={{ color: "black" }}>I want to...</h1>
-
             <div
               style={{
                 display: "flex",
