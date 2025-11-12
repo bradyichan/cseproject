@@ -16,7 +16,7 @@ import treat from "../assets/items/treat.png";
 import uconnpatch from "../assets/items/uconnpatch.png";
 import stylishleash from "../assets/items/stylishleash.png";
 
-// ✅ Map normalized keys → actual image files
+// Map normalized keys → actual image files
 const imageMap: Record<string, string> = {
   bluechewtoy,
   desklamp,
@@ -36,8 +36,16 @@ function normalizeTitle(title: string) {
   return title.trim().replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
 }
 
+interface Item {
+  item_id: string;
+  title: string;
+  price: number;
+  location: string;
+  [key: string]: unknown; // allows additional optional fields
+}
+
 export default function BuyPage() {
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
@@ -76,7 +84,7 @@ export default function BuyPage() {
         {filteredItems.map((item) => {
           const normalized = normalizeTitle(item.title);
 
-          // ✅ Find best matching image key
+          // Find best matching image key
           let imageKey = Object.keys(imageMap).find((k) =>
             normalized.includes(k)
           );
@@ -110,7 +118,7 @@ export default function BuyPage() {
         })}
       </div>
 
-      {/* ✅ Floating Husky */}
+      {/* Floating Husky */}
       <div className="floating-husky">
         <ProfileIcon />
       </div>
