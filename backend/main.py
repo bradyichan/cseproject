@@ -10,7 +10,7 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 from flasgger import Swagger
 #from backend.db.database import init_db
-from db.database import init_db
+#from db.database import init_db
 
 # Import all route blueprints
 #from .users import users_bp
