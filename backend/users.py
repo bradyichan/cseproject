@@ -8,7 +8,7 @@ Date: 2025-11-02
 
 from datetime import datetime
 from flask import Blueprint, jsonify, request
-from db.database import get_connection
+from backend.db.database import get_connection
 
 users_bp = Blueprint("users", __name__, url_prefix="/users")
 
@@ -90,13 +90,17 @@ def register_user():
             "status": "success",
             "data": {"userId": user_id, "username": username, "email": email}
         }), 201
-    except Exception as err:
-        return jsonify({
-            "status": "error",
-            "error": {"code": "DB_ERROR", "message": str(err)}
-        }), 500
+    except ValueError as err:
+        return handle_db_error(err)
     finally:
         conn.close()
+
+def handle_db_error(error):
+    """Handles errors to prevent pylint from getting mad over exception"""
+    return jsonify({
+        "status": "error",
+        "error": {"code": "DB_ERROR", "message": str(error)}
+    }), 500
 
 
 # ---------------------------------------------------------------------

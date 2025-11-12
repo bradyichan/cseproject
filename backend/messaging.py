@@ -70,11 +70,12 @@ def send_message():
     timestamp = datetime.now().isoformat()
     conn = get_db_connection()
     cursor = conn.cursor()
-    # ✅ fixed missing parenthesis before VALUES
+    c_id = "conversation_id"
+    #Pylint says the line above conn.commit() is too long, so this shortens it
     cursor.execute("""
         INSERT INTO messages (conversation_id, sender_id, receiver_id, content, timestamp)
         VALUES (?, ?, ?, ?, ?)
-    """, (data["conversation_id"], data["sender_id"], data["receiver_id"], data["content"], timestamp))
+    """, (data[c_id], data["sender_id"], data["receiver_id"], data["content"], timestamp))
     conn.commit()
     msg_id = cursor.lastrowid
     conn.close()
