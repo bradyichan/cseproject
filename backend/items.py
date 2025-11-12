@@ -23,7 +23,6 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-
 # ---------------------------------------------------------------------
 # POST /items/add (supports JSON and multipart/form-data)
 # ---------------------------------------------------------------------
@@ -35,31 +34,54 @@ def add_item():
     tags:
       - Items
     summary: Add a new item to the marketplace
-    description: |
-      Create a new item by providing title, description, category, price, location, and seller_id.
-      Supports both JSON (no image) and multipart/form-data (with image upload).
-    """
-    # Handle FormData (with image) OR JSON body
-    if request.content_type and request.content_type.startswith("multipart/form-data"):
-        title = request.form.get("title")
-        description = request.form.get("description")
-        category = request.form.get("category")
-        price = request.form.get("price")
-        location = request.form.get("location")
-        seller_id = request.form.get("seller_id")
-        image = request.files.get("image")
-    else:
-        data = request.get_json() or {}
-        title = data.get("title")
-        description = data.get("description")
-        category = data.get("category")
-        price = data.get("price")
-        location = data.get("location")
-        seller_id = data.get("seller_id")
-        image = None
+    consumes:
+      - application/json
+    produces:
+      - application/json
 
-    # Validate required fields
-    if not all([title, description, category, price, location, seller_id]):
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - title
+            - description
+            - category
+            - price
+            - location
+            - seller_id
+          properties:
+            title:
+              type: string
+              example: "Desk Lamp"
+            description:
+              type: string
+              example: "Adjustable LED lamp, great for studying."
+            category:
+              type: string
+              example: "Home"
+            price:
+              type: number
+              example: 25.99
+            location:
+              type: string
+              example: "Storrs, CT"
+            seller_id:
+              type: integer
+              example: 4
+
+    responses:
+      201:
+        description: Item successfully created
+      400:
+        description: Missing required fields
+    """
+    data = request.get_json() or {}
+
+    required_fields = ["title", "description", "category", "price", "location", "seller_id"]
+    if not all(f in data for f in required_fields):
         return jsonify({"status": "error", "message": "Missing required fields"}), 400
 
     # Optional: save uploaded image
@@ -190,8 +212,10 @@ def delete_item(item_id):
     if deleted == 0:
         return jsonify({"status": "error", "message": "Item not found"}), 404
 
-    return jsonify({"status": "success", "message": f"Item {item_id} deleted"}), 200
-
+    return jsonify({
+        "status": "success",
+        "message": f"Item {item_id} deleted"
+    }), 200
 
 # ---------------------------------------------------------------------
 # GET /items/search
@@ -218,3 +242,27 @@ def search_items():
     conn.close()
 
     return jsonify({"status": "success", "data": {"results": results}}), 200
+
+@items_bp.route("/all", methods=["GET"])
+def get_all_items():
+    """
+    Get all items
+    ---
+    tags:
+      - Items
+    summary: Retrieve all items in the marketplace
+    responses:
+      200:
+        description: A list of all items
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id AS item_id, title, description, category, price, location, seller_id, created_at
+        FROM items
+        ORDER BY created_at DESC
+    """)
+    rows = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+
+    return jsonify({"status": "success", "data": {"items": rows}}), 200

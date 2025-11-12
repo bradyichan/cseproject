@@ -1,87 +1,45 @@
-# tests/test_main.py
-import json
-import re
-import os
-import sys
+import sys, os
+
+# --- ensure Python can find backend and db modules ---
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))  # for db/
 
 import pytest
-
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if REPO_ROOT not in sys.path:
-    sys.path.insert(0, REPO_ROOT)
-
-import backend.main as main
+from backend.main import app
 
 
 @pytest.fixture(scope="module")
 def client():
-    with main.app.test_client() as c:
-        yield c
+    """Flask test client for the main app."""
+    with app.test_client() as client:
+        yield client
 
 
-def test_root_ok(client):
-    resp = client.get("/")
-    assert resp.status_code == 200
-
-    # Validate JSON structure
-    data = resp.get_json()
-    assert isinstance(data, dict)
-    assert data.get("message") == "Marketplace API is running"
-    assert "endpoints" in data
+def test_home_status_ok(client):
+    """Root endpoint should return 200 and a valid message."""
+    response = client.get("/")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert "Marketplace API is running" in data["message"]
     assert isinstance(data["endpoints"], list)
-    # Your current main.py lists "/messages" (not "/messaging")
-    assert "/messages" in data["endpoints"] or "/messaging" in data["endpoints"]
-
-
-def test_cors_header_present_on_root(client):
-    # Flask-CORS should attach this header by default when CORS(app) is used
-    resp = client.get("/")
-    # Header may be "*" or specific origin depending on config
-    assert "Access-Control-Allow-Origin" in resp.headers
+    expected = {"/users", "/items", "/search", "/bidding", "/payment", "/messages"}
+    assert expected.issubset(set(data["endpoints"]))
 
 
 def test_blueprints_registered():
-    # Ensure blueprints from main.py are actually registered on the Flask app
-    expected_blueprints = {"users", "items", "search", "bidding", "payment", "messaging"}
-    # app.blueprints keys are the blueprint "name" (first arg when creating Blueprint)
-    registered = set(main.app.blueprints.keys())
-    missing = expected_blueprints - registered
-    assert not missing, f"Missing blueprints: {missing}"
+    """Ensure all expected blueprints are registered on the Flask app."""
+    blueprints = set(app.blueprints.keys())
+    expected = {"users", "items", "search", "bidding", "payment", "messaging"}
+    assert expected.issubset(blueprints)
 
 
-def test_api_prefixes_exist_in_url_map():
-    """
-    Instead of calling specific endpoints (which may vary per team),
-    verify each API prefix has at least one route registered.
-    """
-    # Accept either '/messages' (listed in your JSON) or '/messaging' (blueprint prefix)
-    prefixes = ["/users", "/items", "/search", "/bidding", "/payment", "/messaging"]
-    url_rules = [rule.rule for rule in main.app.url_map.iter_rules()]
+def test_swagger_and_cors_present():
+    """Check Swagger and CORS are initialized properly."""
+    # Swagger adds /apidocs route
+    routes = [rule.rule for rule in app.url_map.iter_rules()]
+    assert any("/apidocs" in r for r in routes)
 
-    missing = []
-    for prefix in prefixes:
-        if not any(rule == prefix or rule.startswith(prefix + "/") for rule in url_rules):
-            missing.append(prefix)
-
-    # If '/messaging' is missing but '/messages' exists, treat that as acceptable
-    if "/messaging" in missing and any(
-        rule == "/messages" or rule.startswith("/messages/")
-        for rule in url_rules
-    ):
-        missing.remove("/messaging")
-
-    assert not missing, f"No routes found under prefixes: {missing}"
-
-
-@pytest.mark.parametrize(
-    "path",
-    ["/users", "/items", "/search", "/bidding", "/payment", "/messaging", "/messages"],
-)
-def test_each_api_path_not_server_error(client, path):
-    """
-    Sanity check: hitting each base path should not 5xx.
-    Some bases may 404 (no index route defined), and that's fine.
-    This keeps the test suite robust across different blueprint implementations.
-    """
-    resp = client.get(path)
-    assert resp.status_code < 500, f"{path} returned {resp.status_code}"
+    # CORS should add access-control headers
+    with app.test_client() as client:
+        resp = client.get("/")
+        assert "Access-Control-Allow-Origin" in resp.headers

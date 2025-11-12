@@ -67,11 +67,11 @@ export default function SellPage() {
         });
         setImageFile(null);
       } else {
-        setMessage(`❌ Error: ${result.message || "Failed to list item"}`);
+        setMessage(`Error: ${result.message || "Failed to list item"}`);
       }
     } catch (error) {
       setMessage(
-        `❌ Error: ${
+        `Error: ${
           error instanceof Error ? error.message : "Failed to connect to server"
         }`
       );
