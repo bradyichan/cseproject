@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import ProfileIcon from "../ProfileIcon";
 import "../App.css";
 
+// ✅ Import all images
 import bluechewtoy from "../assets/items/bluechewtoy.png";
 import desklamp from "../assets/items/desklamp.png";
 import dogwallart from "../assets/items/dogwallart.png";
@@ -15,6 +16,7 @@ import treat from "../assets/items/treat.png";
 import uconnpatch from "../assets/items/uconnpatch.png";
 import stylishleash from "../assets/items/stylishleash.png";
 
+// ✅ Map normalized keys → actual image files
 const imageMap: Record<string, string> = {
   bluechewtoy,
   desklamp,
@@ -27,7 +29,7 @@ const imageMap: Record<string, string> = {
   stainlesssteelbowlset,
   treat,
   uconnpatch,
-  stylishleash
+  stylishleash,
 };
 
 function normalizeTitle(title: string) {
@@ -73,15 +75,30 @@ export default function BuyPage() {
 
       <div className="items-grid">
         {filteredItems.map((item) => {
-          const key = normalizeTitle(item.title);
-          const imgSrc = imageMap[key];
+          const normalized = normalizeTitle(item.title);
+
+          // ✅ Find best matching image key
+          let imageKey = Object.keys(imageMap).find((k) =>
+            normalized.includes(k)
+          );
+
+          if (!imageKey) {
+            imageKey = Object.keys(imageMap).find((k) => k.includes(normalized));
+          }
+
+          const imgSrc = imageKey ? imageMap[imageKey] : null;
 
           return (
             <div className="item-card" key={item.item_id}>
               {imgSrc ? (
                 <img src={imgSrc} alt={item.title} className="item-img" />
               ) : (
-                <div className="no-image">No Image</div>
+                <div
+                  className="no-image"
+                  style={{ width: "100%", height: "300px", background: "#ccc" }}
+                >
+                  No Image
+                </div>
               )}
 
               <div className="item-info">
@@ -94,7 +111,7 @@ export default function BuyPage() {
         })}
       </div>
 
-      {/* ✅ Floating Husky Profile Icon */}
+      {/* ✅ Floating Husky */}
       <div className="floating-husky">
         <ProfileIcon />
       </div>

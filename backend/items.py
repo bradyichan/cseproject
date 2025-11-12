@@ -22,7 +22,6 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-
 # ---------------------------------------------------------------------
 # POST /items/add
 # ---------------------------------------------------------------------
@@ -34,34 +33,44 @@ def add_item():
     tags:
       - Items
     summary: Add a new item to the marketplace
-    description: |
-      Create a new item by providing title, description, category, price, location, and seller_id.
-    requestBody:
-      required: true
-      content:
-        application/json:
-          schema:
-            type: object
-            required: [title, description, category, price, location, seller_id]
-            properties:
-              title:
-                type: string
-                example: "Desk Lamp"
-              description:
-                type: string
-                example: "Adjustable LED lamp, great for studying."
-              category:
-                type: string
-                example: "Home"
-              price:
-                type: number
-                example: 25.99
-              location:
-                type: string
-                example: "Storrs, CT"
-              seller_id:
-                type: integer
-                example: 4
+    consumes:
+      - application/json
+    produces:
+      - application/json
+
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - title
+            - description
+            - category
+            - price
+            - location
+            - seller_id
+          properties:
+            title:
+              type: string
+              example: "Desk Lamp"
+            description:
+              type: string
+              example: "Adjustable LED lamp, great for studying."
+            category:
+              type: string
+              example: "Home"
+            price:
+              type: number
+              example: 25.99
+            location:
+              type: string
+              example: "Storrs, CT"
+            seller_id:
+              type: integer
+              example: 4
+
     responses:
       201:
         description: Item successfully created
@@ -104,35 +113,6 @@ def add_item():
             "created_at": created_at
         }
     }), 201
-
-
-# ---------------------------------------------------------------------
-# GET /items/all
-# ---------------------------------------------------------------------
-@items_bp.route("/all", methods=["GET"])
-def get_all_items():
-    """
-    Get all items
-    ---
-    tags:
-      - Items
-    summary: Retrieve all items in the marketplace
-    responses:
-      200:
-        description: A list of all items
-    """
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT id AS item_id, title, description, category, price, location, seller_id, created_at
-        FROM items
-        ORDER BY created_at DESC
-    """)
-    rows = [dict(row) for row in cursor.fetchall()]
-    conn.close()
-
-    return jsonify({"status": "success", "data": {"items": rows}}), 200
-
 
 # ---------------------------------------------------------------------
 # GET /items/<item_id>
@@ -269,7 +249,6 @@ def delete_item(item_id):
         "message": f"Item {item_id} deleted"
     }), 200
 
-
 # ---------------------------------------------------------------------
 # GET /items/search
 # ---------------------------------------------------------------------
@@ -310,3 +289,27 @@ def search_items():
     conn.close()
 
     return jsonify({"status": "success", "data": {"results": results}}), 200
+
+@items_bp.route("/all", methods=["GET"])
+def get_all_items():
+    """
+    Get all items
+    ---
+    tags:
+      - Items
+    summary: Retrieve all items in the marketplace
+    responses:
+      200:
+        description: A list of all items
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id AS item_id, title, description, category, price, location, seller_id, created_at
+        FROM items
+        ORDER BY created_at DESC
+    """)
+    rows = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+
+    return jsonify({"status": "success", "data": {"items": rows}}), 200
