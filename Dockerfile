@@ -13,16 +13,16 @@ FROM python:3.9-slim
 WORKDIR /backend
 
 #copy requirements
-COPY requirements.txt .
+COPY backend/requirements.txt .
 
 #install the necessary packages (for this, Flask, flasgger, and flask_cors)
 RUN pip install --no-cache-dir -r requirements.txt
 
 #copy the rest of the files
-COPY . .
+COPY backend/ ./backend
 
 #expose port this will run on
 EXPOSE 6767
 
 #run app!
-CMD ["python3", "main.py"]
+CMD ["python3", "-m", "backend.main"]
