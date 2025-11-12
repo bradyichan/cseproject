@@ -84,13 +84,6 @@ def add_item():
     if not all(f in data for f in required_fields):
         return jsonify({"status": "error", "message": "Missing required fields"}), 400
 
-    # Optional: save uploaded image
-    image_filename = None
-    if image:
-        upload_dir = os.path.join(os.path.dirname(__file__), "uploads")
-        os.makedirs(upload_dir, exist_ok=True)
-        image_filename = image.filename
-        image.save(os.path.join(upload_dir, image_filename))
 
     # Save to DB
     conn = get_db_connection()
@@ -101,25 +94,29 @@ def add_item():
         INSERT INTO items (title, description, category, price, location, seller_id, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
-        (title, description, category, price, location, seller_id, created_at),
+        (
+        data["title"],
+        data["description"],
+        data["category"],
+        data["price"],
+        data["location"],
+        data["seller_id"],
+        created_at
+    )
     )
     conn.commit()
     item_id = cursor.lastrowid
     conn.close()
 
-    return jsonify(
-        {
-            "status": "success",
-            "data": {
-                "item_id": item_id,
-                "title": title,
-                "price": price,
-                "location": location,
-                "image_filename": image_filename,
-                "created_at": created_at,
-            },
+    return jsonify({
+        "status": "success",
+        "data": {
+            "item_id": item_id,
+            "title": data["title"],
+            "price": data["price"],
+            "created_at": created_at
         }
-    ), 201
+    }), 201
 
 
 # ---------------------------------------------------------------------
@@ -242,27 +239,3 @@ def search_items():
     conn.close()
 
     return jsonify({"status": "success", "data": {"results": results}}), 200
-
-@items_bp.route("/all", methods=["GET"])
-def get_all_items():
-    """
-    Get all items
-    ---
-    tags:
-      - Items
-    summary: Retrieve all items in the marketplace
-    responses:
-      200:
-        description: A list of all items
-    """
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT id AS item_id, title, description, category, price, location, seller_id, created_at
-        FROM items
-        ORDER BY created_at DESC
-    """)
-    rows = [dict(row) for row in cursor.fetchall()]
-    conn.close()
-
-    return jsonify({"status": "success", "data": {"items": rows}}), 200
