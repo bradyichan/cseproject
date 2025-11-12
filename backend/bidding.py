@@ -27,6 +27,7 @@ def get_db_connection():
 # ---------------------------------------------------------------------
 @bidding_bp.route("/place", methods=["POST"])
 def place_bid():
+    # pylint: disable=duplicate-code
     """
     Place a new bid
     ---
@@ -88,6 +89,7 @@ def place_bid():
       400:
         description: Missing required fields
     """
+    # pylint: enable=duplicate-code
     data = request.get_json() or {}
     required_fields = ["item_id", "bidder_id", "amount"]
     if not all(f in data for f in required_fields):
