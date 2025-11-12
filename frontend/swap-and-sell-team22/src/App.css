@@ -40,9 +40,9 @@
   align-items: center;
 }
 
-/* .profileicon { /* button that take you to your profile (MAKE SURE THIS IS ON EVERY PAGE!!!!)*/
+.profileicon { /* button that take you to your profile (MAKE SURE THIS IS ON EVERY PAGE!!!!)*/
   position: fixed;
-  top: 50px;
+  bottom: 50px;
   right: 50px; 
   border-radius: 50%;
   z-index: 1000; /*puts on top of all other items*/
