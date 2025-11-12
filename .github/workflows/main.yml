@@ -11,6 +11,7 @@ on:
       - main
       - develop
       - ci-and-tests
+      - copy-of-main
 
 jobs:
   # Each job runs in parallel
