@@ -37,7 +37,7 @@ def global_search():
       Perform a global keyword search that looks across all key database tables:
       - **Items** → title, description, category  
       - **Users** → username, email  
-      - **Bids** → amount, status
+      - **Bids** → amount, status, and linked item titles
     parameters:
       - name: query
         in: query
@@ -49,44 +49,6 @@ def global_search():
     responses:
       200:
         description: Combined search results returned successfully
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                status:
-                  type: string
-                  example: success
-                data:
-                  type: object
-                  properties:
-                    items:
-                      type: array
-                      items:
-                        type: object
-                        properties:
-                          item_id: {type: integer, example: 5}
-                          title: {type: string, example: "Canon DSLR Camera"}
-                          price: {type: number, example: 499.99}
-                    users:
-                      type: array
-                      items:
-                        type: object
-                        properties:
-                          user_id: {type: integer, example: 3}
-                          username: {type: string, example: "john_doe"}
-                          email: {type: string, example: "john@example.com"}
-                    bids:
-                      type: array
-                      items:
-                        type: object
-                        properties:
-                          bid_id: {type: integer, example: 15}
-                          item_id: {type: integer, example: 5}
-                          amount: {type: number, example: 325.00}
-                          status: {type: string, example: pending}
-      400:
-        description: Missing search query
     """
     query = request.args.get("query", "").strip()
     if not query:
@@ -98,7 +60,9 @@ def global_search():
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    # -----------------------------------------------------------------
     # Search items
+    # -----------------------------------------------------------------
     cursor.execute("""
         SELECT id AS item_id, title, description, category, price, location
         FROM items
@@ -106,7 +70,9 @@ def global_search():
     """, (f"%{query}%", f"%{query}%", f"%{query}%"))
     items = [dict(row) for row in cursor.fetchall()]
 
+    # -----------------------------------------------------------------
     # Search users
+    # -----------------------------------------------------------------
     cursor.execute("""
         SELECT id AS user_id, username, email
         FROM users
@@ -114,12 +80,16 @@ def global_search():
     """, (f"%{query}%", f"%{query}%"))
     users = [dict(row) for row in cursor.fetchall()]
 
-    # Search bids
+    # -----------------------------------------------------------------
+    # Search bids (now joins items to capture related titles)
+    # -----------------------------------------------------------------
     cursor.execute("""
-        SELECT id AS bid_id, item_id, bidder_id, amount, status
-        FROM bids
-        WHERE CAST(amount AS TEXT) LIKE ? OR status LIKE ?
-    """, (f"%{query}%", f"%{query}%"))
+        SELECT b.id AS bid_id, b.item_id, b.bidder_id, b.amount, b.status
+        FROM bids b
+        JOIN items i ON b.item_id = i.id
+        WHERE i.title LIKE ? OR i.description LIKE ?
+              OR CAST(b.amount AS TEXT) LIKE ? OR b.status LIKE ?
+    """, (f"%{query}%", f"%{query}%", f"%{query}%", f"%{query}%"))
     bids = [dict(row) for row in cursor.fetchall()]
 
     conn.close()

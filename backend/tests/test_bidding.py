@@ -1,123 +1,153 @@
-# tests/test_bidding.py
-import copy
-import importlib
-import sys
-import os
+"""
+Pytest suite for bidding.py
+Tests all bidding endpoints using a temporary SQLite database.
+"""
 
+import sys, os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+
+import tempfile
+import sqlite3
 import pytest
 from flask import Flask
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-import bidding
+from backend.bidding import bidding_bp, DB_PATH, get_db_connection
 
-
+# ---------------------------------------------------------------------
+#  FIXTURE: Flask test client + temporary DB
+# ---------------------------------------------------------------------
 @pytest.fixture(scope="function")
-def app_client():
-    """
-    Fresh Flask test client with a clean copy of bidding.items and bidding.bids
-    for each test. Restores globals after test completes.
-    """
-    # Snapshot originals
-    original_items = copy.deepcopy(bidding.items)
-    original_bids = copy.deepcopy(bidding.bids)
-
-    # Build app & register blueprint
+def app_client(tmp_path):
+    """Spin up a Flask app with a temporary SQLite DB for each test."""
     app = Flask(__name__)
-    app.register_blueprint(bidding.bidding_bp)
-    client = app.test_client()
+    app.register_blueprint(bidding_bp)
 
-    yield client
+    # Create temp DB path
+    test_db = tmp_path / "test_marketplace.db"
+    os.makedirs(test_db.parent, exist_ok=True)
 
-    # Restore globals
-    bidding.items.clear()
-    bidding.items.update(copy.deepcopy(original_items))
-    bidding.bids.clear()
-    bidding.bids.extend(copy.deepcopy(original_bids))
+    # Monkeypatch the DB_PATH used by bidding.py
+    from backend import bidding
+    bidding.DB_PATH = str(test_db)
 
+    # Create schema
+    conn = sqlite3.connect(str(test_db))
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE bids (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            item_id INTEGER NOT NULL,
+            bidder_id INTEGER NOT NULL,
+            amount REAL NOT NULL,
+            status TEXT NOT NULL,
+            timestamp TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
 
-def test_get_all_items(app_client):
-    resp = app_client.get("/bidding/items")
-    assert resp.status_code == 200
-    data = resp.get_json()
-    assert "items" in data
-    # assert 1 in data["items"] and 2 in data["items"]
-
-
-def test_get_item_ok_and_not_found(app_client):
-    ok = app_client.get("/bidding/item/1")
-    assert ok.status_code == 200
-    assert ok.get_json()["name"] == "Gaming Laptop"
-
-    nf = app_client.get("/bidding/item/999")
-    assert nf.status_code == 404
-    assert nf.get_json()["error"] == "Item not found"
-
-
-def test_place_bid_requires_bidder_and_amount(app_client):
-    r1 = app_client.post("/bidding/item/1/bid", json={"bidder": "sam"})
-    r2 = app_client.post("/bidding/item/1/bid", json={"amount": 600})
-    assert r1.status_code == 400
-    assert r2.status_code == 400
-    assert r1.get_json()["error"] == "Missing bidder or amount"
-    assert r2.get_json()["error"] == "Missing bidder or amount"
+    with app.test_client() as client:
+        yield client
 
 
-def test_place_bid_not_found_and_too_low(app_client):
-    nf = app_client.post("/bidding/item/999/bid", json={"bidder": "sam", "amount": 10})
-    assert nf.status_code == 404
-    assert nf.get_json()["error"] == "Item not found"
+# ---------------------------------------------------------------------
+#  Helper: Insert test bid rows
+# ---------------------------------------------------------------------
+def insert_bid(item_id, bidder_id, amount, status="pending", timestamp="2025-11-01T00:00:00"):
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute(
+        "INSERT INTO bids (item_id, bidder_id, amount, status, timestamp) VALUES (?, ?, ?, ?, ?)",
+        (item_id, bidder_id, amount, status, timestamp),
+    )
+    conn.commit()
+    conn.close()
 
-    # Too low (<= current bid of 500)
-    low = app_client.post("/bidding/item/1/bid", json={"bidder": "sam", "amount": 500})
-    assert low.status_code == 400
-    j = low.get_json()
-    assert j["status"] == "failed"
-    assert "low" in j["message"].lower()
 
+# ---------------------------------------------------------------------
+#  TESTS
+# ---------------------------------------------------------------------
 
-def test_place_bid_success_and_status_reflects_change(app_client):
-    # Place a valid higher bid on item 1 (current bid is 500)
-    resp = app_client.post("/bidding/item/1/bid", json={"bidder": "sam", "amount": 550})
-    assert resp.status_code == 200
+def test_place_bid_success(app_client):
+    """POST /bidding/place should create a new bid"""
+    payload = {"item_id": 1, "bidder_id": 2, "amount": 50.5}
+    resp = app_client.post("/bidding/place", json=payload)
+    assert resp.status_code == 201
     data = resp.get_json()
     assert data["status"] == "success"
-    assert data["new_highest_bid"] == 550
-
-    # Status reflects the update
-    status = app_client.get("/bidding/item/1/status")
-    assert status.status_code == 200
-    s = status.get_json()
-    assert s["current_bid"] == 550
-    assert s["highest_bidder"] == "sam"
-    assert s["status"] == "open"
-
-    # History shows the bid
-    hist = app_client.get("/bidding/history/sam")
-    assert hist.status_code == 200
-    h = hist.get_json()
-    assert h["username"] == "sam"
-    assert len(h["bids"]) == 1
-    assert h["bids"][0]["item_id"] == 1
-    assert h["bids"][0]["amount"] == 550
+    assert data["data"]["item_id"] == 1
+    assert data["data"]["bidder_id"] == 2
+    assert data["data"]["amount"] == 50.5
 
 
-def test_buy_now_happy_path_and_blocks_further_bids(app_client):
-    # Buy-now on item 2
-    buy = app_client.post("/bidding/item/2/buy", json={"buyer": "alex"})
-    assert buy.status_code == 200
-    b = buy.get_json()
-    assert b["status"] == "purchased"
-    assert b["confirmation"]["item_id"] == 2
-    assert b["confirmation"]["buyer"] == "alex"
-    assert b["confirmation"]["amount"] == bidding.items[2]["buy_now"]
-    assert b["confirmation"]["confirmation_code"].startswith("BUY-")
+def test_place_bid_missing_fields(app_client):
+    """POST /bidding/place should return 400 if required fields are missing"""
+    resp = app_client.post("/bidding/place", json={"item_id": 1})
+    assert resp.status_code == 400
+    assert resp.get_json()["status"] == "error"
 
-    # Once sold, trying to bid should fail with "Bidding closed"
-    bid_after = app_client.post("/bidding/item/2/bid", json={"bidder": "sam", "amount": 100})
-    assert bid_after.status_code == 400
-    assert bid_after.get_json()["error"] == "Bidding closed"
 
-    # And trying to buy again should be blocked
-    buy_again = app_client.post("/bidding/item/2/buy", json={"buyer": "lisa"})
-    assert buy_again.status_code == 400
-    assert buy_again.get_json()["error"] == "Item not available"
+def test_get_bids_for_item(app_client):
+    """GET /bidding/item/<id> returns list of bids"""
+    insert_bid(1, 10, 100)
+    insert_bid(1, 20, 120)
+    resp = app_client.get("/bidding/item/1")
+    assert resp.status_code == 200
+    data = resp.get_json()["data"]["bids"]
+    assert len(data) == 2
+    assert data[0]["amount"] >= data[1]["amount"]  # Sorted desc
+
+
+def test_accept_bid_success(app_client):
+    """PUT /bidding/accept/<id> should accept target bid and reject others"""
+    insert_bid(1, 10, 100)
+    insert_bid(1, 20, 200)
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM bids WHERE amount = 200")
+    bid_id = cur.fetchone()[0]
+    conn.close()
+
+    resp = app_client.put(f"/bidding/accept/{bid_id}")
+    assert resp.status_code == 200
+    data = resp.get_json()["data"]
+    assert data["status"] == "accepted"
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM bids WHERE status='rejected'")
+    rejected_count = cur.fetchone()[0]
+    conn.close()
+    assert rejected_count == 1
+
+
+def test_accept_bid_not_found(app_client):
+    """PUT /bidding/accept/<id> for nonexistent bid should return 404"""
+    resp = app_client.put("/bidding/accept/999")
+    assert resp.status_code == 404
+    assert resp.get_json()["status"] == "error"
+
+
+def test_get_highest_bid_ok(app_client):
+    """GET /bidding/highest/<id> returns highest bid"""
+    insert_bid(2, 10, 100)
+    insert_bid(2, 11, 150)
+    resp = app_client.get("/bidding/highest/2")
+    assert resp.status_code == 200
+    highest = resp.get_json()["data"]
+    assert highest["amount"] == 150
+
+
+def test_get_highest_bid_not_found(app_client):
+    """GET /bidding/highest/<id> returns 404 when no bids exist"""
+    resp = app_client.get("/bidding/highest/999")
+    assert resp.status_code == 404
+
+
+def test_user_bid_history_empty(app_client):
+    """GET /bidding/history/<username> returns empty list (no in-memory data)"""
+    resp = app_client.get("/bidding/history/sam")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["username"] == "sam"
+    assert data["bids"] == []

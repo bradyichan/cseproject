@@ -1,109 +1,114 @@
-# tests/test_search.py
-import copy
+import sys, os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
+import sqlite3
 import pytest
 from flask import Flask
-
-import search  # your search.py module
+from backend.search import search_bp, get_db_connection
 
 
 @pytest.fixture(scope="function")
-def app_client():
-    """
-    Fresh Flask test client; restore search.listings after each test
-    in case any test mutates it (defensive).
-    """
-    original_listings = copy.deepcopy(search.listings)
-
+def app_client(tmp_path):
+    """Spin up a Flask app with a temporary SQLite DB for each test."""
     app = Flask(__name__)
-    app.register_blueprint(search.search_bp)
-    client = app.test_client()
+    app.register_blueprint(search_bp)
 
-    yield client
+    # Temporary database
+    test_db = tmp_path / "test_marketplace.db"
+    os.makedirs(test_db.parent, exist_ok=True)
 
-    search.listings.clear()
-    search.listings.extend(copy.deepcopy(original_listings))
+    from backend import search
+    search.DB_PATH = str(test_db)
+
+    # Create schema
+    conn = sqlite3.connect(str(test_db))
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
+            category TEXT NOT NULL,
+            price REAL NOT NULL,
+            location TEXT NOT NULL
+        )
+    """)
+    c.execute("""
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            email TEXT NOT NULL
+        )
+    """)
+    c.execute("""
+        CREATE TABLE bids (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            item_id INTEGER NOT NULL,
+            bidder_id INTEGER NOT NULL,
+            amount REAL NOT NULL,
+            status TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+    with app.test_client() as client:
+        yield client
 
 
-def test_search_all_when_no_filters(app_client):
-    # With no query/filters, all listings should be returned
-    resp = app_client.get("/search/")
+# ---------------------------------------------------------------------
+# Helper: Insert sample data
+# ---------------------------------------------------------------------
+def insert_sample_data():
+    conn = get_db_connection()
+    c = conn.cursor()
+    # Items
+    c.execute("INSERT INTO items (title, description, category, price, location) VALUES (?, ?, ?, ?, ?)",
+              ("Canon DSLR Camera", "Used camera in great condition", "Electronics", 499.99, "Storrs"))
+    c.execute("INSERT INTO items (title, description, category, price, location) VALUES (?, ?, ?, ?, ?)",
+              ("Desk Lamp", "Adjustable LED lamp", "Home", 25.00, "Hartford"))
+    # Users
+    c.execute("INSERT INTO users (username, email) VALUES (?, ?)", ("john_doe", "john@example.com"))
+    c.execute("INSERT INTO users (username, email) VALUES (?, ?)", ("camera_guy", "cam@example.com"))
+    # Bids
+    c.execute("INSERT INTO bids (item_id, bidder_id, amount, status) VALUES (?, ?, ?, ?)", (1, 1, 325.00, "pending"))
+    c.execute("INSERT INTO bids (item_id, bidder_id, amount, status) VALUES (?, ?, ?, ?)", (1, 2, 350.00, "accepted"))
+    conn.commit()
+    conn.close()
+
+
+# ---------------------------------------------------------------------
+# TESTS
+# ---------------------------------------------------------------------
+
+def test_search_success(app_client):
+    """GET /search/?query=camera should return matching results from all tables."""
+    insert_sample_data()
+    resp = app_client.get("/search/?query=camera")
     assert resp.status_code == 200
+    data = resp.get_json()["data"]
+
+    # Items should include the camera
+    assert any("Camera" in i["title"] for i in data["items"])
+    # Users should include 'camera_guy'
+    assert any("camera_guy" in u["username"] for u in data["users"])
+    # Bids should exist
+    assert len(data["bids"]) >= 1
+
+
+def test_search_by_category(app_client):
+    """Should match results by category (case-insensitive)."""
+    insert_sample_data()
+    resp = app_client.get("/search/?query=home")
+    assert resp.status_code == 200
+    items = resp.get_json()["data"]["items"]
+    assert any("Lamp" in i["title"] for i in items)
+
+
+def test_search_missing_query(app_client):
+    """GET /search/ with no query should return 400."""
+    resp = app_client.get("/search/")
+    assert resp.status_code == 400
     data = resp.get_json()
-    assert data["count"] == len(search.listings)
-    assert len(data["results"]) == len(search.listings)
-
-
-def test_search_by_query_and_category(app_client):
-    # q=laptop -> should match "Gaming Laptop" only
-    r1 = app_client.get("/search/?q=laptop")
-    assert r1.status_code == 200
-    d1 = r1.get_json()
-    assert d1["count"] == 1
-    assert d1["results"][0]["title"] == "Gaming Laptop"
-
-    # category=electronics (case-insensitive) -> ids 1 and 5
-    r2 = app_client.get("/search/?category=Electronics")
-    assert r2.status_code == 200
-    d2 = r2.get_json()
-    returned_ids = sorted([x["id"] for x in d2["results"]])
-    assert returned_ids == [1, 5]
-
-
-def test_search_by_price_range_and_sorting(app_client):
-    # Price between 50 and 200 -> ids 4 ($100) and 5 ($60)
-    r = app_client.get("/search/?min_price=50&max_price=200")
-    assert r.status_code == 200
-    d = r.get_json()
-    ids = sorted([x["id"] for x in d["results"]])
-    assert ids == [4, 5]
-
-    # Sorting: Electronics by ascending price -> id 5 ($60) then id 1 ($750)
-    r_sort = app_client.get("/search/?category=electronics&sort=price_asc")
-    assert r_sort.status_code == 200
-    d_sort = r_sort.get_json()
-    titles_in_order = [x["title"] for x in d_sort["results"]]
-    assert titles_in_order == ["Wireless Earbuds", "Gaming Laptop"]
-
-    # Descending price -> reverse order
-    r_sort_desc = app_client.get("/search/?category=electronics&sort=price_desc")
-    assert r_sort_desc.status_code == 200
-    d_sort_desc = r_sort_desc.get_json()
-    titles_in_order_desc = [x["title"] for x in d_sort_desc["results"]]
-    assert titles_in_order_desc == ["Gaming Laptop", "Wireless Earbuds"]
-
-
-def test_search_no_results_returns_404(app_client):
-    r = app_client.get("/search/?q=thiswillnotmatchanything")
-    assert r.status_code == 404
-    d = r.get_json()
-    assert d["message"] == "No results found"
-    assert d["results"] == []
-
-
-def test_suggestions_default_and_with_query(app_client):
-    # Default suggestions when no query
-    r_def = app_client.get("/search/suggestions")
-    assert r_def.status_code == 200
-    d_def = r_def.get_json()
-    # At least includes these baseline suggestions
-    for s in ["laptop", "headphones", "jacket", "lamp"]:
-        assert s in d_def["suggestions"]
-
-    # With a query: "lap" should match titles containing "lap" (lowercased)
-    r_q = app_client.get("/search/suggestions?q=lap")
-    assert r_q.status_code == 200
-    d_q = r_q.get_json()
-    # "gaming laptop" and "vintage lamp" both contain "lap"
-    assert "gaming laptop" in d_q["suggestions"]
-    # assert "vintage lamp" in d_q["suggestions"]
-
-
-def test_get_item_details_ok_and_not_found(app_client):
-    ok = app_client.get("/search/item/3")
-    assert ok.status_code == 200
-    assert ok.get_json()["title"] == "Mountain Bike"
-
-    nf = app_client.get("/search/item/999")
-    assert nf.status_code == 404
-    assert nf.get_json()["error"] == "Item not found"
+    assert data["status"] == "error"
+    assert "Missing search query" in data["message"]

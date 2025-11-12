@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import ProfileIcon from "../ProfileIcon";
 import "../App.css";
 
-// ✅ Import all images
+//  Import all images
 import bluechewtoy from "../assets/items/bluechewtoy.png";
 import desklamp from "../assets/items/desklamp.png";
 import dogwallart from "../assets/items/dogwallart.png";
@@ -70,7 +70,6 @@ export default function BuyPage() {
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
-        <button className="filter-button">Filter By..</button>
       </div>
 
       <div className="items-grid">

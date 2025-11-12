@@ -1,113 +1,124 @@
-# tests/test_messaging.py
-import copy
-import re
+import sys, os
 
+# Ensure backend package is discoverable before any imports
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+
+import sqlite3
 import pytest
 from flask import Flask
-
-import messaging  # your messaging.py module
+from backend.messaging import messaging_bp, get_db_connection
 
 
 @pytest.fixture(scope="function")
-def app_client():
-    """
-    Fresh Flask test client with a clean copy of messaging.conversations.
-    Restores globals after each test.
-    """
-    original_convos = copy.deepcopy(messaging.conversations)
-
+def app_client(tmp_path):
+    """Spin up a Flask app with a temporary SQLite DB for each test."""
     app = Flask(__name__)
-    app.register_blueprint(messaging.messaging_bp)
-    client = app.test_client()
+    app.register_blueprint(messaging_bp)
 
-    yield client
+    # Temporary DB
+    test_db = tmp_path / "test_marketplace.db"
+    os.makedirs(test_db.parent, exist_ok=True)
 
-    # Restore module global
-    messaging.conversations.clear()
-    messaging.conversations.update(copy.deepcopy(original_convos))
+    from backend import messaging
+    messaging.DB_PATH = str(test_db)
+
+    # Create schema
+    conn = sqlite3.connect(str(test_db))
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            conversation_id TEXT NOT NULL,
+            sender_id INTEGER NOT NULL,
+            receiver_id INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            timestamp TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+    with app.test_client() as client:
+        yield client
 
 
-def test_get_all_conversations_initial_empty(app_client):
-    resp = app_client.get("/messages/")
-    assert resp.status_code == 200
-    data = resp.get_json()
-    assert data["chats"] == []
+def insert_message(conversation_id="conv_1", sender_id=1, receiver_id=2,
+                   content="Hi!", timestamp="2025-11-11T00:00:00"):
+    """Helper to insert a message into the temporary DB."""
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO messages (conversation_id, sender_id, receiver_id, content, timestamp)
+        VALUES (?, ?, ?, ?, ?)
+    """, (conversation_id, sender_id, receiver_id, content, timestamp))
+    conn.commit()
+    conn.close()
 
 
-def test_send_message_requires_fields(app_client):
-    r1 = app_client.post("/messages/chatA/send", json={"sender": "sam", "message": "hi"})
-    r2 = app_client.post("/messages/chatA/send", json={"receiver": "alex", "message": "hi"})
-    r3 = app_client.post("/messages/chatA/send", json={"sender": "sam", "receiver": "alex"})
-    for r in (r1, r2, r3):
-        assert r.status_code == 400
-        assert "Missing" in r.get_json()["error"]
+# ---------------------------------------------------------------------
+# TESTS
+# ---------------------------------------------------------------------
 
-
-def test_send_message_creates_chat_and_returns_201(app_client):
-    payload = {"sender": "sam", "receiver": "alex", "message": "hello"}
-    resp = app_client.post("/messages/room1/send", json=payload)
+def test_send_message_success(app_client):
+    payload = {
+        "conversation_id": "conv_123",
+        "sender_id": 1,
+        "receiver_id": 2,
+        "content": "Hello!"
+    }
+    resp = app_client.post("/messaging/send", json=payload)
     assert resp.status_code == 201
     data = resp.get_json()
-    assert data["status"] == "sent"
-    assert data["chat_id"] == "room1"
-    msg = data["message"]
-    assert msg["sender"] == "sam"
-    assert msg["receiver"] == "alex"
-    assert msg["message"] == "hello"
-    # Timestamp present and formatted like YYYY-MM-DD HH:MM:SS
-    assert re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$", msg["timestamp"])
-
-    # Chat should now appear in list of conversations
-    chats = app_client.get("/messages/").get_json()["chats"]
-    assert "room1" in chats
+    assert data["status"] == "success"
+    assert data["data"]["conversation_id"] == "conv_123"
 
 
-def test_get_conversation_ok_and_not_found(app_client):
-    # Seed one chat with a message
-    app_client.post(
-        "/messages/room2/send",
-        json={"sender": "sam", "receiver": "alex", "message": "first"},
-    )
-
-    ok = app_client.get("/messages/room2")
-    assert ok.status_code == 200
-    conv = ok.get_json()
-    assert conv["chat_id"] == "room2"
-    assert isinstance(conv["messages"], list)
-    assert len(conv["messages"]) == 1
-    assert conv["messages"][0]["message"] == "first"
-
-    nf = app_client.get("/messages/nope")
-    assert nf.status_code == 404
-    assert nf.get_json()["error"] == "Chat not found"
+def test_send_message_missing_fields(app_client):
+    resp = app_client.post("/messaging/send", json={"sender_id": 1})
+    assert resp.status_code == 400
+    assert resp.get_json()["status"] == "error"
 
 
-def test_get_latest_message_ok_and_missing(app_client):
-    # Missing chat -> 404
-    missing = app_client.get("/messages/ghost/latest")
-    assert missing.status_code == 404
-    assert "No messages" in missing.get_json()["error"]
-
-    # Send two messages, ensure latest is the second
-    app_client.post(
-        "/messages/room3/send",
-        json={"sender": "sam", "receiver": "alex", "message": "one"},
-    )
-    app_client.post(
-        "/messages/room3/send",
-        json={"sender": "alex", "receiver": "sam", "message": "two"},
-    )
-    latest = app_client.get("/messages/room3/latest")
-    assert latest.status_code == 200
-    last = latest.get_json()
-    assert last["message"] == "two"
-    assert last["sender"] == "alex"
-    assert last["receiver"] == "sam"
+def test_get_conversation_success(app_client):
+    insert_message("conv_1", 1, 2, "Hi!")
+    insert_message("conv_1", 2, 1, "Hey back!")
+    resp = app_client.get("/messaging/conversation/conv_1")
+    assert resp.status_code == 200
+    messages = resp.get_json()["data"]["conversation"]
+    assert len(messages) == 2
+    assert messages[0]["sender_id"] == 1
 
 
-def test_latest_404_when_chat_exists_but_empty(app_client):
-    # Manually create an empty conversation to hit the second 404 branch
-    messaging.conversations["emptyRoom"] = []
-    resp = app_client.get("/messages/emptyRoom/latest")
+def test_get_conversation_not_found(app_client):
+    resp = app_client.get("/messaging/conversation/conv_x")
     assert resp.status_code == 404
-    assert "No messages" in resp.get_json()["error"]
+    assert resp.get_json()["status"] == "error"
+
+
+def test_get_user_conversations(app_client):
+    insert_message("conv_1", 1, 2, "Msg1")
+    insert_message("conv_2", 2, 1, "Msg2")
+    insert_message("conv_3", 3, 4, "Other users")
+    resp = app_client.get("/messaging/user/1")
+    assert resp.status_code == 200
+    data = resp.get_json()["data"]["conversations"]
+    assert set(data) == {"conv_1", "conv_2"}
+
+
+def test_delete_message_success(app_client):
+    insert_message("conv_1", 1, 2, "Delete me")
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM messages LIMIT 1")
+    msg_id = cur.fetchone()[0]
+    conn.close()
+
+    resp = app_client.delete(f"/messaging/delete/{msg_id}")
+    assert resp.status_code == 200
+    assert "deleted" in resp.get_json()["message"]
+
+
+def test_delete_message_not_found(app_client):
+    resp = app_client.delete("/messaging/delete/9999")
+    assert resp.status_code == 404
+    assert resp.get_json()["status"] == "error"
