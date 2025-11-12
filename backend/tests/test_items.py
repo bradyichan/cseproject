@@ -1,129 +1,159 @@
-# tests/test_items.py
-import copy
-import re
+import sys, os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
+import sqlite3
 import pytest
 from flask import Flask
-
-import items  # your items.py module
+from backend.items import items_bp, get_db_connection
 
 
 @pytest.fixture(scope="function")
-def app_client():
-    """
-    Fresh Flask test client with clean copies of items.items and items.next_id.
-    Restores globals after each test to avoid state leakage.
-    """
-    original_items = copy.deepcopy(items.items)
-    original_next_id = copy.deepcopy(items.next_id)
-
+def app_client(tmp_path):
+    """Spin up a Flask app with a temporary SQLite DB for each test."""
     app = Flask(__name__)
-    app.register_blueprint(items.items_bp)
-    client = app.test_client()
+    app.register_blueprint(items_bp)
 
-    yield client
+    # Temporary database
+    test_db = tmp_path / "test_marketplace.db"
+    os.makedirs(test_db.parent, exist_ok=True)
 
-    # Restore module globals
-    items.items.clear()
-    items.items.update(copy.deepcopy(original_items))
-    items.next_id.clear()
-    items.next_id.update(copy.deepcopy(original_next_id))
+    from backend import items
+    items.DB_PATH = str(test_db)
+
+    # Create schema
+    conn = sqlite3.connect(str(test_db))
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
+            category TEXT NOT NULL,
+            price REAL NOT NULL,
+            location TEXT NOT NULL,
+            seller_id INTEGER NOT NULL,
+            created_at TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+    with app.test_client() as client:
+        yield client
+
+
+def insert_item(title="Lamp", description="Nice", category="Home",
+                price=10.0, location="Storrs", seller_id=1):
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO items (title, description, category, price, location, seller_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, '2025-11-11T00:00:00')
+    """, (title, description, category, price, location, seller_id))
+    conn.commit()
+    conn.close()
+
+
+def test_add_item_success(app_client):
+    payload = {
+        "title": "Desk Lamp",
+        "description": "LED light",
+        "category": "Home",
+        "price": 25.5,
+        "location": "CT",
+        "seller_id": 7
+    }
+    r = app_client.post("/items/add", json=payload)
+    assert r.status_code == 201
+    assert r.get_json()["status"] == "success"
+
+
+def test_add_item_missing_fields(app_client):
+    r = app_client.post("/items/add", json={"title": "Incomplete"})
+    assert r.status_code == 400
+    assert r.get_json()["status"] == "error"
+
+
+def test_get_item_by_id_found(app_client):
+    insert_item("Chair", "Wooden", "Furniture", 50, "UConn", 3)
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM items LIMIT 1")
+    item_id = cur.fetchone()[0]
+    conn.close()
+
+    r = app_client.get(f"/items/{item_id}")
+    assert r.status_code == 200
+    assert r.get_json()["data"]["item_id"] == item_id
+
+
+def test_get_item_not_found(app_client):
+    r = app_client.get("/items/9999")
+    assert r.status_code == 404
+
+
+def test_update_item_success(app_client):
+    insert_item("Old", "desc", "misc", 5, "CT", 2)
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM items LIMIT 1")
+    item_id = cur.fetchone()[0]
+    conn.close()
+
+    r = app_client.put(f"/items/update/{item_id}", json={"price": 99.99})
+    assert r.status_code == 200
+    data = r.get_json()["data"]
+    assert data["item_id"] == item_id
+    assert "price" in data["updated_fields"]
+
+
+def test_update_item_invalid(app_client):
+    insert_item()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM items LIMIT 1")
+    item_id = cur.fetchone()[0]
+    conn.close()
+
+    r = app_client.put(f"/items/update/{item_id}", json={"invalid": "oops"})
+    assert r.status_code == 400
+
+
+def test_delete_item_success(app_client):
+    insert_item()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM items LIMIT 1")
+    item_id = cur.fetchone()[0]
+    conn.close()
+
+    r = app_client.delete(f"/items/delete/{item_id}")
+    assert r.status_code == 200
+    assert "deleted" in r.get_json()["message"]
+
+
+def test_delete_item_not_found(app_client):
+    r = app_client.delete("/items/delete/999")
+    assert r.status_code == 404
+
+
+def test_search_items_ok(app_client):
+    insert_item("Red Lamp", "desc", "Home", 10, "CT", 1)
+    insert_item("Green Lamp", "desc", "Home", 20, "CT", 1)
+    r = app_client.get("/items/search?query=Lamp")
+    assert r.status_code == 200
+    assert len(r.get_json()["data"]["results"]) >= 1
+
+
+def test_search_items_missing_query(app_client):
+    r = app_client.get("/items/search")
+    assert r.status_code == 400
 
 
 def test_get_all_items(app_client):
-    resp = app_client.get("/items/")
-    assert resp.status_code == 200
-    data = resp.get_json()
-    assert data["count"] == len(items.items)
-    assert isinstance(data["items"], list)
-    assert any(it["title"] == "Gaming Laptop" for it in data["items"])
-
-
-def test_get_item_ok_and_not_found(app_client):
-    ok = app_client.get("/items/1")
-    assert ok.status_code == 200
-    assert ok.get_json()["title"] == "Gaming Laptop"
-
-    nf = app_client.get("/items/999")
-    assert nf.status_code == 404
-    assert nf.get_json()["error"] == "Item not found"
-
-
-def test_create_item_requires_fields(app_client):
-    r = app_client.post("/items/create", json={"title": "X", "price": 10})
-    assert r.status_code == 400
-    assert "Missing" in r.get_json()["error"]
-
-
-def test_create_item_success_increments_id_and_sets_created_at(app_client):
-    starting_next = items.next_id["value"]
-    payload = {
-        "title": "Desk Chair",
-        "category": "Furniture",
-        "price": 129.99,
-        "seller": "sam",
-    }
-    resp = app_client.post("/items/create", json=payload)
-    assert resp.status_code == 201
-    data = resp.get_json()
-    assert data["status"] == "created"
-    created = data["item"]
-
-    # ID assigned from next_id and then incremented
-    assert created["id"] == starting_next
-    assert items.next_id["value"] == starting_next + 1
-
-    # Basic field echoes
-    assert created["title"] == "Desk Chair"
-    assert created["category"] == "Furniture"
-    assert created["seller"] == "sam"
-    # Price coerced to float
-    assert isinstance(created["price"], float)
-    assert created["price"] == pytest.approx(129.99)
-
-    # created_at present and YYYY-MM-DD HH:MM:SS-ish
-    assert "created_at" in created
-    assert re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$", created["created_at"])
-
-    # Item is stored in module state
-    assert created["id"] in items.items
-
-
-def test_update_item_ok_and_not_found(app_client):
-    # Update existing
-    upd = app_client.put("/items/1/update", json={"price": 799, "status": "reserved"})
-    assert upd.status_code == 200
-    j = upd.get_json()
-    assert j["status"] == "updated"
-    assert j["item"]["price"] == 799
-    assert j["item"]["status"] == "reserved"
-
-    # Update missing
-    nf = app_client.put("/items/999/update", json={"title": "Nope"})
-    assert nf.status_code == 404
-    assert nf.get_json()["error"] == "Item not found"
-
-
-def test_delete_item_ok_and_not_found(app_client):
-    # Delete existing
-    d = app_client.delete("/items/3/delete")
-    assert d.status_code == 200
-    j = d.get_json()
-    assert j["status"] == "deleted"
-    assert j["item"]["id"] == 3
-    assert 3 not in items.items
-
-    # Delete missing
-    nf = app_client.delete("/items/999/delete")
-    assert nf.status_code == 404
-    assert nf.get_json()["error"] == "Item not found"
-
-
-def test_get_items_by_seller(app_client):
-    resp = app_client.get("/items/seller/alex")
-    assert resp.status_code == 200
-    data = resp.get_json()
-    assert data["seller"] == "alex"
-    # In seed data, alex sells ids 1 and 3
-    returned_ids = sorted([it["id"] for it in data["items"]])
-    assert returned_ids == [1, 3]
+    insert_item("Desk", "desc", "Office", 50, "CT", 1)
+    insert_item("Chair", "desc", "Office", 75, "CT", 2)
+    r = app_client.get("/items/all")
+    assert r.status_code == 200
+    items = r.get_json()["data"]["items"]
+    assert len(items) >= 2
