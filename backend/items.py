@@ -239,4 +239,3 @@ def search_items():
     conn.close()
 
     return jsonify({"status": "success", "data": {"results": results}}), 200
-    
