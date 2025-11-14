@@ -2,52 +2,19 @@ import { useEffect, useState } from "react";
 import ProfileIcon from "../ProfileIcon";
 import "../App.css";
 
-//  Import all images
-import bluechewtoy from "../assets/items/bluechewtoy.png";
-import desklamp from "../assets/items/desklamp.png";
-import dogwallart from "../assets/items/dogwallart.png";
-import dogwinterjacket from "../assets/items/dogwinterjacket.png";
-import lioncostume from "../assets/items/lioncostume.png";
-import peanutbuttertreats from "../assets/items/peanutbuttertreats.png";
-import softgroomingbrush from "../assets/items/softgroomingbrush.png";
-import squeakyfoxtoy from "../assets/items/squeakyfoxtoy.png";
-import stainlesssteelbowlset from "../assets/items/stainlesssteelbowlset.png";
-import treat from "../assets/items/treat.png";
-import uconnpatch from "../assets/items/uconnpatch.png";
-import stylishleash from "../assets/items/stylishleash.png";
-
-// Map normalized keys → actual image files
-const imageMap: Record<string, string> = {
-  bluechewtoy,
-  desklamp,
-  dogwallart,
-  dogwinterjacket,
-  lioncostume,
-  peanutbuttertreats,
-  softgroomingbrush,
-  squeakyfoxtoy,
-  stainlesssteelbowlset,
-  treat,
-  uconnpatch,
-  stylishleash,
-};
-
-function normalizeTitle(title: string) {
-  return title.trim().replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
-}
-
 interface Item {
-  item_id: string;
+  item_id: number;
   title: string;
   price: number;
   location: string;
-  [key: string]: unknown; // allows additional optional fields
+  image_filename?: string;
 }
 
 export default function BuyPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Fetch items from backend
   useEffect(() => {
     fetch("http://127.0.0.1:6767/items/all")
       .then((res) => res.json())
@@ -59,6 +26,7 @@ export default function BuyPage() {
       .catch((err) => console.error("Fetch error:", err));
   }, []);
 
+  // Filter items
   const filteredItems = items.filter((item) =>
     item.title.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -67,7 +35,7 @@ export default function BuyPage() {
     <div className="buy-wrapper" style={{ padding: "20px" }}>
       <div className="buy-header">
         <h2>Browse Items</h2>
-        <a href="/">← Back to Home</a>
+        <a href="/" className="back-home-link">← Back to Home</a>
       </div>
 
       <div className="search-row">
@@ -82,18 +50,9 @@ export default function BuyPage() {
 
       <div className="items-grid">
         {filteredItems.map((item) => {
-          const normalized = normalizeTitle(item.title);
-
-          // Find best matching image key
-          let imageKey = Object.keys(imageMap).find((k) =>
-            normalized.includes(k)
-          );
-
-          if (!imageKey) {
-            imageKey = Object.keys(imageMap).find((k) => k.includes(normalized));
-          }
-
-          const imgSrc = imageKey ? imageMap[imageKey] : null;
+          const imgSrc = item.image_filename
+            ? `http://127.0.0.1:6767/items/image/${item.image_filename}`
+            : null;
 
           return (
             <div className="item-card" key={item.item_id}>
@@ -102,7 +61,14 @@ export default function BuyPage() {
               ) : (
                 <div
                   className="no-image"
-                  style={{ width: "100%", height: "300px", background: "#ccc" }}
+                  style={{
+                    width: "100%",
+                    height: "300px",
+                    background: "#ccc",
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
                 >
                   No Image
                 </div>
@@ -118,7 +84,6 @@ export default function BuyPage() {
         })}
       </div>
 
-      {/* Floating Husky */}
       <div className="floating-husky">
         <ProfileIcon />
       </div>
