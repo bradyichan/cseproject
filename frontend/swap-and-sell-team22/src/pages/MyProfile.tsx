@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import MyProfileIcon from "../MyProfileIcon";
 import Back2menu from "../components/back2menu";
 
@@ -48,7 +48,6 @@ export default function MyProfile() {
           zIndex: 1000,
           border: "none",
           background: "transparent",
-          textAlign: "center",
         }}
       />
 
@@ -84,7 +83,6 @@ export default function MyProfile() {
           border: "none",
           background: "transparent",
           width: "90%",
-          textAlign: "center",
         }}
       />
 
