@@ -18,6 +18,7 @@ def init_db():
     conn = get_connection()
     cursor = conn.cursor()
 
+    # --- CREATE TABLES ---
     cursor.executescript(
         """
         CREATE TABLE IF NOT EXISTS users (
@@ -37,6 +38,7 @@ def init_db():
             location TEXT,
             seller_id INTEGER,
             created_at TEXT,
+            image_filename TEXT,  -- <<<< NEW COLUMN FOR IMAGE STORAGE
             FOREIGN KEY (seller_id) REFERENCES users(id)
         );
 
@@ -85,7 +87,13 @@ def init_db():
         """
     )
 
+    # --- FORCE ADD COLUMN IF DATABASE ALREADY EXISTS ---
+    try:
+        cursor.execute("ALTER TABLE items ADD COLUMN image_filename TEXT;")
+        print("Added missing image_filename column to items table.")
+    except sqlite3.OperationalError:
+        # Column already exists → do nothing
+        pass
 
     conn.commit()
     conn.close()
-    
