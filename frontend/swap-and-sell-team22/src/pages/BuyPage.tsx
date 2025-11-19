@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import ProfileIcon from "../ProfileIcon";
 import "../App.css";
 
-//  Import all images
+// Import all images
 import bluechewtoy from "../assets/items/bluechewtoy.png";
 import desklamp from "../assets/items/desklamp.png";
 import dogwallart from "../assets/items/dogwallart.png";
@@ -16,7 +17,6 @@ import treat from "../assets/items/treat.png";
 import uconnpatch from "../assets/items/uconnpatch.png";
 import stylishleash from "../assets/items/stylishleash.png";
 
-// Map normalized keys → actual image files
 const imageMap: Record<string, string> = {
   bluechewtoy,
   desklamp,
@@ -41,12 +41,12 @@ interface Item {
   title: string;
   price: number;
   location: string;
-  [key: string]: unknown; // allows additional optional fields
 }
 
 export default function BuyPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetch("http://127.0.0.1:6767/items/all")
@@ -55,8 +55,7 @@ export default function BuyPage() {
         if (data?.data?.items) {
           setItems(data.data.items);
         }
-      })
-      .catch((err) => console.error("Fetch error:", err));
+      });
   }, []);
 
   const filteredItems = items.filter((item) =>
@@ -83,26 +82,33 @@ export default function BuyPage() {
       <div className="items-grid">
         {filteredItems.map((item) => {
           const normalized = normalizeTitle(item.title);
-
-          // Find best matching image key
           let imageKey = Object.keys(imageMap).find((k) =>
             normalized.includes(k)
           );
-
           if (!imageKey) {
-            imageKey = Object.keys(imageMap).find((k) => k.includes(normalized));
+            imageKey = Object.keys(imageMap).find((k) =>
+              k.includes(normalized)
+            );
           }
-
           const imgSrc = imageKey ? imageMap[imageKey] : null;
 
           return (
-            <div className="item-card" key={item.item_id}>
+            <div
+              className="item-card"
+              key={item.item_id}
+              onClick={() => navigate(`/payment/${item.item_id}`)}
+              style={{ cursor: "pointer" }}
+            >
               {imgSrc ? (
                 <img src={imgSrc} alt={item.title} className="item-img" />
               ) : (
                 <div
                   className="no-image"
-                  style={{ width: "100%", height: "300px", background: "#ccc" }}
+                  style={{
+                    width: "100%",
+                    height: "300px",
+                    background: "#ccc",
+                  }}
                 >
                   No Image
                 </div>
@@ -118,7 +124,6 @@ export default function BuyPage() {
         })}
       </div>
 
-      {/* Floating Husky */}
       <div className="floating-husky">
         <ProfileIcon />
       </div>
