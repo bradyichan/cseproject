@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import "../App.css";
 
 interface Item {
@@ -13,6 +13,7 @@ interface Item {
 
 export default function ItemPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [item, setItem] = useState<Item | null>(null);
 
   useEffect(() => {
@@ -24,7 +25,8 @@ export default function ItemPage() {
       .catch((err) => console.error(err));
   }, [id]);
 
-  if (!item) return <p style={{ padding: "20px", fontSize: "24px" }}>Loading...</p>;
+  if (!item)
+    return <p style={{ padding: "20px", fontSize: "24px" }}>Loading...</p>;
 
   const imgSrc = item.image_filename
     ? `http://127.0.0.1:6767/items/image/${item.image_filename}`
@@ -101,12 +103,20 @@ export default function ItemPage() {
 
         {/* RIGHT SIDE — PRICE + BUTTONS */}
         <div style={{ flex: "1" }}>
-          <p style={{ fontSize: "64px", fontWeight: "700", marginBottom: "20px" }}>
+          <p
+            style={{
+              fontSize: "64px",
+              fontWeight: "700",
+              marginBottom: "20px",
+            }}
+          >
             ${item.price.toFixed(2)}
           </p>
 
           <div style={{ display: "flex", gap: "25px", marginTop: "20px" }}>
+            {/* BUY NOW -> PAYMENT */}
             <button
+              onClick={() => navigate(`/payment/${item.item_id}`)}
               style={{
                 padding: "18px 40px",
                 backgroundColor: "#ff3b3b",
@@ -137,7 +147,13 @@ export default function ItemPage() {
             </button>
           </div>
 
-          <p style={{ marginTop: "40px", fontSize: "24px", lineHeight: "1.4" }}>
+          <p
+            style={{
+              marginTop: "40px",
+              fontSize: "24px",
+              lineHeight: "1.4",
+            }}
+          >
             {item.description}
           </p>
         </div>
