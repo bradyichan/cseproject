@@ -5,13 +5,12 @@ import { Routes, Route, Link } from "react-router-dom";
 
 import BuyPage from "./pages/BuyPage";
 import SellPage from "./pages/SellPage";
-import MyProfile from "./pages/MyProfile";
-import PaymentPage from "./pages/PaymentPage";
-import SuccessPage from "./pages/SuccessPage";
+import ItemPage from "./pages/ItemPage";
 
 function App() {
   return (
     <Routes>
+      {/* HOME PAGE */}
       <Route
         path="/"
         element={
@@ -34,6 +33,7 @@ function App() {
             </div>
 
             <h1 style={{ color: "black" }}>I want to...</h1>
+
 
             <div
               style={{
@@ -85,15 +85,12 @@ function App() {
         }
       />
 
+      {/* ROUTES */}
       <Route path="/buy" element={<BuyPage />} />
       <Route path="/sell" element={<SellPage />} />
-      <Route path="/profile" element={<MyProfile />} />
 
-      {/* ✅ Payment Flow */}
-      <Route path="/payment/:itemId" element={<PaymentPage />} />
-
-      {/* Success Page */}
-      <Route path="/success" element={<SuccessPage />} />
+      {/* NEW ITEM PAGE */}
+      <Route path="/item/:id" element={<ItemPage />} />
     </Routes>
   );
 }

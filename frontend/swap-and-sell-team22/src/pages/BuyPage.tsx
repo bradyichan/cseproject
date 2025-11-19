@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import ProfileIcon from "../ProfileIcon";
 import "../App.css";
 
@@ -14,14 +15,12 @@ export default function BuyPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Fetch items from backend
+  // Fetch all items from backend
   useEffect(() => {
     fetch("http://127.0.0.1:6767/items/all")
       .then((res) => res.json())
       .then((data) => {
-        if (data?.data?.items) {
-          setItems(data.data.items);
-        }
+        if (data?.data?.items) setItems(data.data.items);
       })
       .catch((err) => console.error("Fetch error:", err));
   }, []);
@@ -55,31 +54,37 @@ export default function BuyPage() {
             : null;
 
           return (
-            <div className="item-card" key={item.item_id}>
-              {imgSrc ? (
-                <img src={imgSrc} alt={item.title} className="item-img" />
-              ) : (
-                <div
-                  className="no-image"
-                  style={{
-                    width: "100%",
-                    height: "300px",
-                    background: "#ccc",
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                  }}
-                >
-                  No Image
-                </div>
-              )}
+            <Link
+              to={`/item/${item.item_id}`}
+              key={item.item_id}
+              style={{ textDecoration: "none", color: "inherit" }}
+            >
+              <div className="item-card">
+                {imgSrc ? (
+                  <img src={imgSrc} alt={item.title} className="item-img" />
+                ) : (
+                  <div
+                    className="no-image"
+                    style={{
+                      width: "100%",
+                      height: "300px",
+                      background: "#ccc",
+                      display: "flex",
+                      justifyContent: "center",
+                      alignItems: "center",
+                    }}
+                  >
+                    No Image
+                  </div>
+                )}
 
-              <div className="item-info">
-                <p className="price">${item.price}</p>
-                <p className="title">{item.title}</p>
-                <p className="state">{item.location}</p>
+                <div className="item-info">
+                  <p className="price">${item.price}</p>
+                  <p className="title">{item.title}</p>
+                  <p className="state">{item.location}</p>
+                </div>
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>
