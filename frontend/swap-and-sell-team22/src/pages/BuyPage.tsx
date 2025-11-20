@@ -16,7 +16,6 @@ export default function BuyPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Fetch items from backend
   useEffect(() => {
     fetch("http://127.0.0.1:6767/items/all")
       .then((res) => res.json())
@@ -28,7 +27,6 @@ export default function BuyPage() {
       .catch((err) => console.error("Fetch error:", err));
   }, []);
 
-  // Filter items
   const filteredItems = items.filter((item) =>
     item.title.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -88,7 +86,12 @@ export default function BuyPage() {
           const sellerName = item.seller_username ; //|| Joe Anonymous
 
           return (
-            <div className="item-card" key={item.item_id}>
+            <Link
+              to={`/item/${item.item_id}`}
+              key={item.item_id}
+              className="item-card"
+              style={{ textDecoration: "none", color: "inherit" }}
+            >
               {imgSrc ? (
                 <img src={imgSrc} alt={item.title} className="item-img" />
               ) : (
@@ -138,7 +141,7 @@ export default function BuyPage() {
                   Delete Item
                 </button>
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>
