@@ -1,10 +1,12 @@
 import "./App.css";
 import ProfileIcon from "./ProfileIcon";
 import Back2menu from "./components/back2menu";
+
 import { Routes, Route, Link } from "react-router-dom";
 
 import BuyPage from "./pages/BuyPage";
 import SellPage from "./pages/SellPage";
+import ItemPage from "./pages/ItemPage";
 import MyProfile from "./pages/MyProfile";
 import PaymentPage from "./pages/PaymentPage";
 import SuccessPage from "./pages/SuccessPage";
@@ -12,6 +14,8 @@ import SuccessPage from "./pages/SuccessPage";
 function App() {
   return (
     <Routes>
+
+      {/* HOME PAGE */}
       <Route
         path="/"
         element={
@@ -29,6 +33,7 @@ function App() {
               <h1 style={{ color: "white" }}>
                 Swap & Sell: Secondhand Marketplace
               </h1>
+
               <ProfileIcon />
               <Back2menu />
             </div>
@@ -85,15 +90,18 @@ function App() {
         }
       />
 
+      {/* MAIN ROUTES */}
       <Route path="/buy" element={<BuyPage />} />
       <Route path="/sell" element={<SellPage />} />
+      <Route path="/item/:id" element={<ItemPage />} />
+
+      {/* PROFILE */}
       <Route path="/profile" element={<MyProfile />} />
 
-      {/* ✅ Payment Flow */}
+      {/* PAYMENT FLOW */}
       <Route path="/payment/:itemId" element={<PaymentPage />} />
-
-      {/* Success Page */}
       <Route path="/success" element={<SuccessPage />} />
+
     </Routes>
   );
 }

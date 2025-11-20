@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import ProfileIcon from "../ProfileIcon";
 import "../App.css";
 
@@ -14,7 +15,6 @@ export default function BuyPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Fetch items from backend
   useEffect(() => {
     fetch("http://127.0.0.1:6767/items/all")
       .then((res) => res.json())
@@ -26,7 +26,6 @@ export default function BuyPage() {
       .catch((err) => console.error("Fetch error:", err));
   }, []);
 
-  // Filter items
   const filteredItems = items.filter((item) =>
     item.title.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -35,7 +34,9 @@ export default function BuyPage() {
     <div className="buy-wrapper" style={{ padding: "20px" }}>
       <div className="buy-header">
         <h2>Browse Items</h2>
-        <a href="/" className="back-home-link">← Back to Home</a>
+        <a href="/" className="back-home-link">
+          ← Back to Home
+        </a>
       </div>
 
       <div className="search-row">
@@ -55,7 +56,12 @@ export default function BuyPage() {
             : null;
 
           return (
-            <div className="item-card" key={item.item_id}>
+            <Link
+              to={`/item/${item.item_id}`}
+              key={item.item_id}
+              className="item-card"
+              style={{ textDecoration: "none", color: "inherit" }}
+            >
               {imgSrc ? (
                 <img src={imgSrc} alt={item.title} className="item-img" />
               ) : (
@@ -79,7 +85,7 @@ export default function BuyPage() {
                 <p className="title">{item.title}</p>
                 <p className="state">{item.location}</p>
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>
