@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 
 interface SignUpProps {
   setIsAuthenticated: (val: boolean) => void;
