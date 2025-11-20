@@ -1,15 +1,14 @@
 import "../App.css";
+import { Link } from "react-router-dom";
 
 const Back2menu = () => {
   return (
-    <a
-      href="http://localhost:5173/"
-      target="_blank"
-      rel="noopener noreferrer"
+    <Link
+      to="/"
       className="back2menu"
     >
       S&S
-    </a>
+    </Link>
   );
 };
 
