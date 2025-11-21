@@ -1,3 +1,7 @@
+import Back2menu from "../components/back2menu";
+import ProfileIcon from "../ProfileIcon";
+import "../App.css";
+
 export default function SuccessPage() {
     return (
       <div
@@ -20,6 +24,10 @@ export default function SuccessPage() {
         >
           Order Confirmed!
         </h1>
+        <Back2menu />
+        <div className="floating-husky">
+          <ProfileIcon />
+        </div>
       </div>
     );
   }

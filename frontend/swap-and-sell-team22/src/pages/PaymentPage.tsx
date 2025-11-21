@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import ProfileIcon from "../ProfileIcon";
+import Back2menu from "../components/back2menu";
 import "../App.css";
 
 interface Item {
@@ -89,8 +90,9 @@ export default function PaymentPage() {
         {/* Page Header */}
         <h1 className="checkout-title">Checkout</h1>
 
-        {/* Husky bottom-right */}
-        <div className="husky-fixed">
+        {/* Profile */}
+        <Back2menu />
+        <div className="floating-husky">
           <ProfileIcon />
         </div>
 

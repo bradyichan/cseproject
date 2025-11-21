@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import "./App.css";
 import ProfileIcon from "./ProfileIcon";
 import Back2menu from "./components/back2menu";
@@ -10,8 +11,35 @@ import ItemPage from "./pages/ItemPage";
 import MyProfile from "./pages/MyProfile";
 import PaymentPage from "./pages/PaymentPage";
 import SuccessPage from "./pages/SuccessPage";
+import LogIn from "./pages/LogIn";
+import SignUp from "./pages/SignUp";
 
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // Check if user is already logged in on mount
+  useEffect(() => {
+    const userId = localStorage.getItem("userId");
+    const username = localStorage.getItem("username");
+    
+    console.log("App mounted - checking localStorage:", { userId, username });
+    
+    if (userId && username) {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
+  // If not authenticated, show login page
+  if (!isAuthenticated) {
+    return (
+      <Routes>
+        <Route path="/signup" element={<SignUp setIsAuthenticated={setIsAuthenticated} />} />
+        <Route path="*" element={<LogIn setIsAuthenticated={setIsAuthenticated} />} />
+      </Routes>
+    );
+  }
+
+  // If authenticated, show the main app
   return (
     <Routes>
 
@@ -97,6 +125,7 @@ function App() {
 
       {/* PROFILE */}
       <Route path="/profile" element={<MyProfile />} />
+
 
       {/* PAYMENT FLOW */}
       <Route path="/payment/:itemId" element={<PaymentPage />} />
