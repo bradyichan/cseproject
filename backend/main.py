@@ -10,17 +10,8 @@ from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
 from flasgger import Swagger
 import os
-#from backend.db.database import init_db
-#from db.database import init_db
 
-# Import all route blueprints
-#from .users import users_bp
-#from users import users_bp
-#from items import items_bp
-#from search import search_bp
-#from bidding import bidding_bp
-#from payment import payment_bp
-#from messaging import messaging_bp
+# Correct imports based on your folder structure
 from backend.db.database import init_db
 from backend.users import users_bp
 from backend.items import items_bp
@@ -28,6 +19,7 @@ from backend.search import search_bp
 from backend.bidding import bidding_bp
 from backend.payment import payment_bp
 from backend.messaging import messaging_bp
+
 
 # Initialize Flask
 app = Flask(__name__)
@@ -42,6 +34,7 @@ app.register_blueprint(bidding_bp)
 app.register_blueprint(payment_bp)
 app.register_blueprint(messaging_bp)
 
+# File serving endpoint
 @app.route("/uploads/<path:filename>")
 def uploaded_file(filename):
     upload_folder = os.path.join(os.path.dirname(__file__), "uploads")
