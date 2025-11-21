@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import LogIn from "./pages/LogIn";
 import SignUp from "./pages/SignUp";
 import BuyPage from "./pages/BuyPage";
 import SellPage from "./pages/SellPage";
+import ItemPage from "./pages/ItemPage";
 import MyProfile from "./pages/MyProfile";
 import PaymentPage from "./pages/PaymentPage";
 import SuccessPage from "./pages/SuccessPage";
@@ -13,6 +14,16 @@ import Back2menu from "./components/back2menu";
 
 function LogInOrSignUp() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // Check localStorage on mount
+  useEffect(() => {
+    const userId = localStorage.getItem("userId");
+    const username = localStorage.getItem("username");
+    
+    if (userId && username) {
+      setIsAuthenticated(true);
+    }
+  }, []);
 
   return (
     <Routes>
@@ -29,9 +40,10 @@ function LogInOrSignUp() {
       {/* App routes - only accessible when authenticated */}
       {isAuthenticated && (
         <>
-          <Route path="/" element={<MainApp />} />
+          <Route path="/" element={<MainApp setIsAuthenticated={setIsAuthenticated} />} />
           <Route path="/buy" element={<BuyPage />} />
           <Route path="/sell" element={<SellPage />} />
+          <Route path="/item/:id" element={<ItemPage />} />
           <Route path="/profile" element={<MyProfile />} />
           <Route path="/payment/:itemId" element={<PaymentPage />} />
           <Route path="/success" element={<SuccessPage />} />
@@ -43,7 +55,16 @@ function LogInOrSignUp() {
 }
 
 // Main app home page
-function MainApp() {
+function MainApp({ setIsAuthenticated }: { setIsAuthenticated: (val: boolean) => void }) {
+  const handleLogout = () => {
+    // Clear localStorage
+    localStorage.removeItem("userId");
+    localStorage.removeItem("username");
+    
+    // Update authentication state
+    setIsAuthenticated(false);
+  };
+
   return (
     <div className="container">
       <div
@@ -54,6 +75,7 @@ function MainApp() {
           display: "inline-block",
           width: "400px",
           height: "250px",
+          position: "relative",
         }}
       >
         <h1 style={{ color: "white" }}>
@@ -61,6 +83,26 @@ function MainApp() {
         </h1>
         <ProfileIcon />
         <Back2menu />
+        
+        {/* Logout button */}
+        <button
+          onClick={handleLogout}
+          style={{
+            position: "absolute",
+            top: "10px",
+            right: "10px",
+            backgroundColor: "red",
+            color: "white",
+            border: "none",
+            borderRadius: "5px",
+            padding: "8px 16px",
+            cursor: "pointer",
+            fontSize: "14px",
+            fontWeight: "bold",
+          }}
+        >
+          Log Out
+        </button>
       </div>
 
       <h1 style={{ color: "black" }}>I want to...</h1>
