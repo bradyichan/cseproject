@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import ProfileIcon from "../ProfileIcon";
 
 export default function SellPage() {
   const [formData, setFormData] = useState({
@@ -8,7 +9,7 @@ export default function SellPage() {
     category: "",
     price: "",
     location: "",
-    seller_id: "1", // default seller for now
+    seller_id: "", // Will be set from localStorage
   });
 
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -41,11 +42,29 @@ export default function SellPage() {
     setIsSubmitting(true);
     setMessage("");
 
+    // Get userId from localStorage
+    const userId = localStorage.getItem("userId");
+    const username = localStorage.getItem("username");
+    
+    console.log("Retrieved from localStorage:", { userId, username });
+    
+    if (!userId) {
+      setMessage("Error: You must be logged in to list an item");
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       const data = new FormData();
-      Object.entries(formData).forEach(([key, value]) =>
-        data.append(key, value)
-      );
+      // Add all form fields
+      Object.entries(formData).forEach(([key, value]) => {
+        if (key !== "seller_id") {
+          data.append(key, value);
+        }
+      });
+      // Add the actual seller_id from localStorage
+      data.append("seller_id", userId);
+      
       if (imageFile) data.append("image", imageFile);
 
       const response = await fetch("http://127.0.0.1:6767/items/add", {
@@ -63,15 +82,15 @@ export default function SellPage() {
           category: "",
           price: "",
           location: "",
-          seller_id: "1",
+          seller_id: "",
         });
         setImageFile(null);
       } else {
-        setMessage(`❌ Error: ${result.message || "Failed to list item"}`);
+        setMessage(`Error: ${result.message || "Failed to list item"}`);
       }
     } catch (error) {
       setMessage(
-        `❌ Error: ${
+        `Error: ${
           error instanceof Error ? error.message : "Failed to connect to server"
         }`
       );
@@ -131,8 +150,8 @@ export default function SellPage() {
             <option value="">Select a category</option>
             <option value="Electronics">Electronics</option>
             <option value="Books">Books</option>
-            <option value="Furniture">Furniture</option>
             <option value="Clothing">Clothing</option>
+            <option value="Furniture">Furniture</option>
             <option value="Home">Home</option>
             <option value="Sports">Sports</option>
             <option value="Other">Other</option>
@@ -215,6 +234,9 @@ export default function SellPage() {
           </div>
         )}
       </form>
+      <div className="floating-husky">
+        <ProfileIcon />
+      </div>
     </div>
   );
 }
