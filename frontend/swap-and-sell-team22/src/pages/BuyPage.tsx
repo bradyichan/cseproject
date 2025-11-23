@@ -48,7 +48,7 @@ export default function BuyPage() {
         alert(data.message || "Delete failed.");
       }
     } catch (err) {
-      alert("Server error deleting item.");
+      alert(err);
     }
   }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useParams, Link } from "react-router-dom";
 import "../App.css";
 
@@ -76,6 +76,7 @@ export default function ItemPage() {
   // Open bid modal
   // -----------------------------
   function handleOpenBidModal() {
+    if (!item) return;
     setBidError("");
 
     // Prefill with min acceptable bid
@@ -158,9 +159,9 @@ export default function ItemPage() {
 
       setShowBidModal(false);
       alert("Bid placed successfully!");
-    } catch (err: any) {
+    } catch (err) {
       console.error("Bid error:", err);
-      setBidError(err.message || "Error placing bid.");
+      setBidError("Error placing bid.");
     } finally {
       setSubmittingBid(false);
     }

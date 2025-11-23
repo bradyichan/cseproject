@@ -5,11 +5,10 @@ and configures Swagger and CORS for the Marketplace API.
 Author: Team 22 - CSE 2102
 Date: 2025-10-27
 """
-
+import os
 from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
 from flasgger import Swagger
-import os
 
 # Correct imports based on your folder structure
 from backend.db.database import init_db
@@ -37,12 +36,14 @@ app.register_blueprint(messaging_bp)
 # File serving endpoint
 @app.route("/uploads/<path:filename>")
 def uploaded_file(filename):
+    """upload file"""
     upload_folder = os.path.join(os.path.dirname(__file__), "uploads")
     return send_from_directory(upload_folder, filename)
 
 # Root endpoint
 @app.route("/")
 def home():
+    """Home page"""
     return jsonify({
         "message": "Marketplace API is running",
         "endpoints": [

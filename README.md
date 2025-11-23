@@ -19,9 +19,8 @@
 
 #### Running Directly
 ```bash
-cd backend
-pip install -r requirements.txt
-python main.py
+pip install -r backend/requirements.txt
+python3 -m backend.main
 ```
 The backend API will be available at `http://127.0.0.1:6767`
 
