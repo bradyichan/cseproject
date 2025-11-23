@@ -20,6 +20,7 @@ os.makedirs(IMAGE_FOLDER, exist_ok=True)
 
 
 def get_db_connection():
+    """Get database connection"""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
@@ -30,6 +31,7 @@ def get_db_connection():
 # ---------------------------------------------------------
 @items_bp.route("/image/<filename>")
 def serve_image(filename):
+    """Serves image to frontend"""
     return send_from_directory(IMAGE_FOLDER, filename)
 
 
@@ -106,6 +108,7 @@ def add_item():
 # ---------------------------------------------------------
 @items_bp.route("/all", methods=["GET"])
 def get_all_items():
+    """Get all items"""
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -137,6 +140,7 @@ def get_all_items():
 # ---------------------------------------------------------
 @items_bp.route("/<int:item_id>", methods=["GET"])
 def get_item_by_id(item_id):
+    """get item based on ID"""
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -172,6 +176,7 @@ def get_item_by_id(item_id):
 # ---------------------------------------------------------
 @items_bp.route("/update/<int:item_id>", methods=["PUT"])
 def update_item(item_id):
+    """Update items"""
     data = request.get_json() or {}
     allowed = ["title", "description", "category", "price", "location"]
 
@@ -199,6 +204,7 @@ def update_item(item_id):
 # ---------------------------------------------------------
 @items_bp.route("/delete/<int:item_id>", methods=["DELETE"])
 def delete_item(item_id):
+    """delete items"""
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -218,6 +224,7 @@ def delete_item(item_id):
 # ---------------------------------------------------------
 @items_bp.route("/search", methods=["GET"])
 def search_items():
+    """search items"""
     query = request.args.get("query", "").strip()
 
     if not query:

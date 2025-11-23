@@ -158,9 +158,9 @@ export default function ItemPage() {
 
       setShowBidModal(false);
       alert("Bid placed successfully!");
-    } catch (err: any) {
+    } catch (err) {
       console.error("Bid error:", err);
-      setBidError(err.message || "Error placing bid.");
+      setBidError("Error placing bid.");
     } finally {
       setSubmittingBid(false);
     }
