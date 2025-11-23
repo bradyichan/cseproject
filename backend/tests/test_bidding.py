@@ -33,6 +33,8 @@ def app_client(tmp_path):
     # Create schema
     conn = sqlite3.connect(str(test_db))
     cursor = conn.cursor()
+    
+    # Create bids table
     cursor.execute("""
         CREATE TABLE bids (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,6 +45,32 @@ def app_client(tmp_path):
             timestamp TEXT NOT NULL
         )
     """)
+    
+    # Create items table (needed by place_bid)
+    cursor.execute("""
+        CREATE TABLE items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
+            category TEXT NOT NULL,
+            price REAL NOT NULL,
+            location TEXT NOT NULL,
+            seller_id INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            image_filename TEXT
+        )
+    """)
+    
+    # Create users table (needed by user_bid_history)
+    cursor.execute("""
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL
+        )
+    """)
+    
     conn.commit()
     conn.close()
 
@@ -64,12 +92,39 @@ def insert_bid(item_id, bidder_id, amount, status="pending", timestamp="2025-11-
     conn.close()
 
 
+# Helper: Insert test item
+def insert_item(item_id, title="Test Item", price=10.0):
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO items (id, title, description, category, price, location, seller_id, created_at)
+        VALUES (?, ?, 'desc', 'category', ?, 'location', 1, '2025-11-01T00:00:00')
+    """, (item_id, title, price))
+    conn.commit()
+    conn.close()
+
+
+# Helper: Insert test user
+def insert_user(user_id, username, email="test@example.com"):
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO users (id, username, email, password_hash)
+        VALUES (?, ?, ?, 'hash123')
+    """, (user_id, username, email))
+    conn.commit()
+    conn.close()
+
+
 # ---------------------------------------------------------------------
 #  TESTS
 # ---------------------------------------------------------------------
 
 def test_place_bid_success(app_client):
     """POST /bidding/place should create a new bid"""
+    # First create the item that will be bid on
+    insert_item(1, "Test Item", 25.0)
+    
     payload = {"item_id": 1, "bidder_id": 2, "amount": 50.5}
     resp = app_client.post("/bidding/place", json=payload)
     assert resp.status_code == 201
@@ -78,6 +133,14 @@ def test_place_bid_success(app_client):
     assert data["data"]["item_id"] == 1
     assert data["data"]["bidder_id"] == 2
     assert data["data"]["amount"] == 50.5
+    
+    # Verify that the item price was updated
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT price FROM items WHERE id = 1")
+    updated_price = c.fetchone()[0]
+    conn.close()
+    assert updated_price == 50.5
 
 
 def test_place_bid_missing_fields(app_client):
@@ -146,8 +209,26 @@ def test_get_highest_bid_not_found(app_client):
 
 def test_user_bid_history_empty(app_client):
     """GET /bidding/history/<username> returns empty list (no in-memory data)"""
+    # Create a user first
+    insert_user(1, "sam")
+    
     resp = app_client.get("/bidding/history/sam")
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["username"] == "sam"
     assert data["bids"] == []
+
+
+def test_user_bid_history_with_bids(app_client):
+    """GET /bidding/history/<username> returns user's bid history"""
+    # Create user and bids
+    insert_user(5, "alice", "alice@test.com")
+    insert_bid(1, 5, 100)
+    insert_bid(2, 5, 150)
+    
+    resp = app_client.get("/bidding/history/alice")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["username"] == "alice"
+    assert len(data["bids"]) == 2
+    
