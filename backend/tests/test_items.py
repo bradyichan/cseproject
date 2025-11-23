@@ -20,7 +20,7 @@ def app_client(tmp_path):
     from backend import items
     items.DB_PATH = str(test_db)
 
-    # Create schema with image_filename column
+    # Create schema
     conn = sqlite3.connect(str(test_db))
     c = conn.cursor()
     c.execute("""
@@ -158,4 +158,3 @@ def test_get_all_items(app_client):
     assert r.status_code == 200
     items = r.get_json()["data"]["items"]
     assert len(items) >= 2
-    

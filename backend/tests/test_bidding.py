@@ -46,7 +46,7 @@ def app_client(tmp_path):
         )
     """)
     
-    # Create items table (needed by place_bid)
+    # Create items table
     cursor.execute("""
         CREATE TABLE items (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -61,7 +61,7 @@ def app_client(tmp_path):
         )
     """)
     
-    # Create users table (needed by user_bid_history)
+    # Create users table
     cursor.execute("""
         CREATE TABLE users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -231,4 +231,3 @@ def test_user_bid_history_with_bids(app_client):
     data = resp.get_json()
     assert data["username"] == "alice"
     assert len(data["bids"]) == 2
-    
