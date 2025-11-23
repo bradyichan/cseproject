@@ -32,7 +32,8 @@ def app_client(tmp_path):
             price REAL NOT NULL,
             location TEXT NOT NULL,
             seller_id INTEGER NOT NULL,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            image_filename TEXT
         )
     """)
     conn.commit()
@@ -47,8 +48,8 @@ def insert_item(title="Lamp", description="Nice", category="Home",
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("""
-        INSERT INTO items (title, description, category, price, location, seller_id, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, '2025-11-11T00:00:00')
+        INSERT INTO items (title, description, category, price, location, seller_id, created_at, image_filename)
+        VALUES (?, ?, ?, ?, ?, ?, '2025-11-11T00:00:00', NULL)
     """, (title, description, category, price, location, seller_id))
     conn.commit()
     conn.close()
