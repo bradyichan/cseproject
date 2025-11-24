@@ -1,13 +1,16 @@
-import { useEffect, useState, FormEvent } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useEffect, useState, type FormEvent } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import "../App.css";
 
 interface Item {
   item_id: number;
   title: string;
-  price: number;
+  price: number | string;
   description: string;
   location: string;
+  category?: string;
+  seller_id: number;
+  seller_username: string;
   image_filename?: string;
 }
 
@@ -20,14 +23,26 @@ interface Bid {
 
 export default function ItemPage() {
   const { id } = useParams();
-  const [item, setItem] = useState<Item | null>(null);
+  const navigate = useNavigate();
 
+  const [item, setItem] = useState<Item | null>(null);
   const [highestBid, setHighestBid] = useState<Bid | null>(null);
 
   const [showBidModal, setShowBidModal] = useState(false);
   const [bidAmount, setBidAmount] = useState("");
   const [bidError, setBidError] = useState("");
   const [submittingBid, setSubmittingBid] = useState(false);
+
+  // Safely convert item.price to a number
+  function getPriceValue(it: Item | null): number {
+    if (!it) return 0;
+    const raw = it.price;
+    if (typeof raw === "string") {
+      const num = Number(raw);
+      return Number.isNaN(num) ? 0 : num;
+    }
+    return raw;
+  }
 
   // -----------------------------
   // Load item
@@ -72,17 +87,21 @@ export default function ItemPage() {
     ? `http://127.0.0.1:6767/items/image/${item.image_filename}`
     : null;
 
+  const listingPrice = getPriceValue(item);
+
   // -----------------------------
   // Open bid modal
   // -----------------------------
   function handleOpenBidModal() {
     setBidError("");
 
-    // Prefill with min acceptable bid
+    // Rule you wanted:
+    // - If there IS a bid → min = highestBid + 1 (we'll prefill that)
+    // - If there is NO bid → no real minimum, just let them type anything > 0
     if (highestBid) {
       setBidAmount((highestBid.amount + 1).toString());
     } else {
-      setBidAmount((item.price + 1).toString());
+      setBidAmount(""); // let them choose starting bid
     }
 
     setShowBidModal(true);
@@ -115,10 +134,10 @@ export default function ItemPage() {
       return;
     }
 
-    const minBid = highestBid ? highestBid.amount : item.price;
-    if (numericBid <= minBid) {
+    // Only enforce “must beat highest bid” — ignore listing price
+    if (highestBid && numericBid <= highestBid.amount) {
       setBidError(
-        `Your bid must be higher than $${minBid.toFixed(2)}.`
+        `Your bid must be higher than $${highestBid.amount.toFixed(2)}.`
       );
       return;
     }
@@ -142,7 +161,7 @@ export default function ItemPage() {
         throw new Error(data.message || "Failed to place bid.");
       }
 
-      // Update highest bid state
+      // Update highest bid state ONLY – do NOT change item.price
       const newBid: Bid = {
         bid_id: data.data.bid_id,
         bidder_id: data.data.bidder_id,
@@ -151,16 +170,13 @@ export default function ItemPage() {
       };
       setHighestBid(newBid);
 
-      // 🔥 "Simply update the price" on the page so user sees it
-      setItem((prev) =>
-        prev ? { ...prev, price: numericBid } : prev
-      );
+      // DO NOT mutate item.price → keep listing price the same
 
       setShowBidModal(false);
       alert("Bid placed successfully!");
-    } catch (err: any) {
+    } catch (err) {
       console.error("Bid error:", err);
-      setBidError(err.message || "Error placing bid.");
+      setBidError("Error placing bid.");
     } finally {
       setSubmittingBid(false);
     }
@@ -233,10 +249,14 @@ export default function ItemPage() {
           <p style={{ marginTop: "-10px", fontSize: "22px", color: "#333" }}>
             {item.location}
           </p>
+          <p style={{ fontSize: "20px", marginTop: "10px" }}>
+            Seller: <b>{item.seller_username}</b>
+          </p>
         </div>
 
         {/* RIGHT SIDE — PRICE + BUTTONS + HIGHEST BID */}
         <div style={{ flex: "1" }}>
+          {/* LISTING PRICE — NEVER CHANGES FROM BIDS */}
           <p
             style={{
               fontSize: "64px",
@@ -244,12 +264,13 @@ export default function ItemPage() {
               marginBottom: "10px",
             }}
           >
-            ${item.price.toFixed(2)}
+            ${listingPrice.toFixed(2)}
           </p>
 
+          {/* HIGHEST BID INFO */}
           {highestBid ? (
             <p style={{ fontSize: "20px", marginBottom: "10px" }}>
-              Current highest bid:{" "}
+              Highest bid:{" "}
               <strong>${highestBid.amount.toFixed(2)}</strong>
             </p>
           ) : (
@@ -304,6 +325,22 @@ export default function ItemPage() {
           >
             {item.description}
           </p>
+
+          {/* MESSAGE SELLER */}
+          <p
+            style={{
+              marginTop: "20px",
+              fontSize: "20px",
+              color: "blue",
+              textDecoration: "underline",
+              cursor: "pointer",
+            }}
+            onClick={() =>
+              navigate(`/messages/${item.seller_id}/${item.item_id}`)
+            }
+          >
+            Message {item.seller_username}
+          </p>
         </div>
       </div>
 
@@ -333,14 +370,15 @@ export default function ItemPage() {
             <p style={{ marginBottom: "10px" }}>
               Item: <strong>{item.title}</strong>
             </p>
+
             {highestBid ? (
               <p style={{ marginBottom: "10px", fontSize: "14px" }}>
-                Current highest bid: ${highestBid.amount.toFixed(2)}
+                Current highest bid: ${highestBid.amount.toFixed(2)}. Your bid
+                must be higher than this.
               </p>
             ) : (
               <p style={{ marginBottom: "10px", fontSize: "14px" }}>
-                No bids yet – your bid must be higher than $
-                {item.price.toFixed(2)}.
+                No bids yet – enter any positive amount to start the bidding.
               </p>
             )}
 
@@ -361,7 +399,13 @@ export default function ItemPage() {
               />
 
               {bidError && (
-                <p style={{ color: "red", fontSize: "14px", marginBottom: "8px" }}>
+                <p
+                  style={{
+                    color: "red",
+                    fontSize: "14px",
+                    marginBottom: "8px",
+                  }}
+                >
                   {bidError}
                 </p>
               )}
