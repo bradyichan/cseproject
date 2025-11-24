@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 interface LogInProps {
   setIsAuthenticated: (val: boolean) => void;
@@ -29,17 +30,18 @@ function LogIn({ setIsAuthenticated }: LogInProps) {
       const data = await response.json();
 
       if (response.ok && data.status === "success") {
-        // Store user data in localStorage for session management
         const userId = data.data.userId.toString();
-        const username = data.data.username;
-        
+        const usernameFromBackend = data.data.username;
+
         localStorage.setItem("userId", userId);
-        localStorage.setItem("username", username);
-        
-        console.log("Stored in localStorage:", { userId, username });
+        localStorage.setItem("username", usernameFromBackend);
+
+        console.log("Stored in localStorage:", {
+          userId,
+          username: usernameFromBackend,
+        });
         setIsAuthenticated(true);
       } else {
-        // Handle error responses
         const errorMessage = data.error?.message || "Login failed";
         alert(errorMessage);
       }
@@ -64,7 +66,15 @@ function LogIn({ setIsAuthenticated }: LogInProps) {
 
         <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
           <div>
-            <label style={{ display: "block", marginBottom: "5px", color: "black" }}>Username</label>
+            <label
+              style={{
+                display: "block",
+                marginBottom: "5px",
+                color: "black",
+              }}
+            >
+              Username
+            </label>
             <input
               type="text"
               value={username}
@@ -74,14 +84,21 @@ function LogIn({ setIsAuthenticated }: LogInProps) {
                 padding: "10px",
                 borderRadius: "5px",
                 border: "1px solid #ccc",
-                
               }}
               required
             />
           </div>
 
           <div>
-            <label style={{ display: "block", marginBottom: "5px", color: "black" }}>Password</label>
+            <label
+              style={{
+                display: "block",
+                marginBottom: "5px",
+                color: "black",
+              }}
+            >
+              Password
+            </label>
             <input
               type="password"
               value={password}
@@ -114,12 +131,18 @@ function LogIn({ setIsAuthenticated }: LogInProps) {
         </div>
 
         <p style={{ marginTop: "20px", color: "black" }}>
-          Don't have an account? <a href="/signup" style={{ color: "blue" }}>Sign Up</a>
+          Don't have an account?{" "}
+          <Link to="/signup" style={{ color: "blue" }}>
+            Sign Up
+          </Link>
         </p>
 
-        <a href="/" style={{ color: "gray", display: "block", marginTop: "10px" }}>
+        <Link
+          to="/"
+          style={{ color: "gray", display: "block", marginTop: "10px" }}
+        >
           ← Back
-        </a>
+        </Link>
       </div>
     </div>
   );

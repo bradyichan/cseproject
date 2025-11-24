@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 interface SignUpProps {
   setIsAuthenticated: (val: boolean) => void;
@@ -14,7 +15,7 @@ function SignUp({ setIsAuthenticated }: SignUpProps) {
       alert("Please fill in all fields");
       return;
     }
-    
+
     if (password !== confirmPassword) {
       alert("Passwords don't match!");
       return;
@@ -28,7 +29,7 @@ function SignUp({ setIsAuthenticated }: SignUpProps) {
         },
         body: JSON.stringify({
           username: username,
-          email: `${username}@placeholder.com`, // Placeholder email since it's required by backend
+          email: `${username}@placeholder.com`, // required by backend
           password: password,
         }),
       });
@@ -36,12 +37,10 @@ function SignUp({ setIsAuthenticated }: SignUpProps) {
       const data = await response.json();
 
       if (response.ok && data.status === "success") {
-        // Store user data in localStorage for session management
         localStorage.setItem("userId", data.data.userId.toString());
         localStorage.setItem("username", data.data.username);
         setIsAuthenticated(true);
       } else {
-        // Handle error responses
         const errorMessage = data.error?.message || "Registration failed";
         alert(errorMessage);
       }
@@ -66,7 +65,15 @@ function SignUp({ setIsAuthenticated }: SignUpProps) {
 
         <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
           <div>
-            <label style={{ display: "block", marginBottom: "5px", color: "black" }}>Username</label>
+            <label
+              style={{
+                display: "block",
+                marginBottom: "5px",
+                color: "black",
+              }}
+            >
+              Username
+            </label>
             <input
               type="text"
               value={username}
@@ -82,7 +89,15 @@ function SignUp({ setIsAuthenticated }: SignUpProps) {
           </div>
 
           <div>
-            <label style={{ display: "block", marginBottom: "5px", color: "black" }}>Password</label>
+            <label
+              style={{
+                display: "block",
+                marginBottom: "5px",
+                color: "black",
+              }}
+            >
+              Password
+            </label>
             <input
               type="password"
               value={password}
@@ -98,7 +113,15 @@ function SignUp({ setIsAuthenticated }: SignUpProps) {
           </div>
 
           <div>
-            <label style={{ display: "block", marginBottom: "5px", color: "black" }}>Confirm Password</label>
+            <label
+              style={{
+                display: "block",
+                marginBottom: "5px",
+                color: "black",
+              }}
+            >
+              Confirm Password
+            </label>
             <input
               type="password"
               value={confirmPassword}
@@ -131,12 +154,18 @@ function SignUp({ setIsAuthenticated }: SignUpProps) {
         </div>
 
         <p style={{ marginTop: "20px", color: "black" }}>
-          Already have an account? <a href="/login" style={{ color: "blue" }}>Log In</a>
+          Already have an account?{" "}
+          <Link to="/login" style={{ color: "blue" }}>
+            Log In
+          </Link>
         </p>
 
-        <a href="/" style={{ color: "gray", display: "block", marginTop: "10px" }}>
+        <Link
+          to="/"
+          style={{ color: "gray", display: "block", marginTop: "10px" }}
+        >
           ← Back
-        </a>
+        </Link>
       </div>
     </div>
   );
