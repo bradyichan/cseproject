@@ -4,7 +4,7 @@ from backend.main import app
 from backend.db.database import init_db
 
 @pytest.fixture(scope="session")
-def app_client():
+def test_app_client():
     # Always use in-memory DB for tests
     os.environ["TEST_DB_PATH"] = ":memory:"
 
