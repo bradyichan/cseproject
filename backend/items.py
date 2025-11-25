@@ -1,6 +1,6 @@
 """
 Module: items.py
-Description: Full item CRUD with image upload + serving images + seller username.
+Description: Full item CRUD with image upload, image serving, and seller username.
 Author: Team 22 - CSE 2102
 """
 
@@ -11,61 +11,47 @@ from flask import Blueprint, jsonify, request, send_from_directory
 
 items_bp = Blueprint("items", __name__, url_prefix="/items")
 
-# Path to SQLite DB
 DB_PATH = os.path.join(os.path.dirname(__file__), "db", "marketplace.db")
-
-# Folder for item images: backend/items/images
 IMAGE_FOLDER = os.path.join(os.path.dirname(__file__), "images")
 os.makedirs(IMAGE_FOLDER, exist_ok=True)
 
 
 def get_db_connection():
-    """Create and return a new DB connection."""
+    """Return a SQLite DB connection with row factory enabled."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 
 # ---------------------------------------------------------
-# SERVE IMAGES BACK TO FRONTEND
-# GET /items/image/<filename>
+# Serve images
 # ---------------------------------------------------------
 @items_bp.route("/image/<filename>")
 def serve_image(filename):
-    """Serve an image file by filename (used by frontend item cards)."""
+    """Serve an uploaded item image by filename."""
     return send_from_directory(IMAGE_FOLDER, filename)
 
 
 # ---------------------------------------------------------
 # POST /items/add
-# Create a new item (with optional image upload)
+# Create a new item
 # ---------------------------------------------------------
 @items_bp.route("/add", methods=["POST"])
 def add_item():
-    """
-    Create a new item.
-    Supports:
-      - JSON body
-      - multipart/form-data with an 'image' file
-
-    Required fields:
-      title, description, category, price, location, seller_id
-    """
-
+    """Create a new item with optional image upload."""
     image_filename = None
 
-    # Multipart form-data (used when uploading an image)
     if request.content_type and request.content_type.startswith("multipart/form-data"):
         form = request.form
         data = form.to_dict()
         image = request.files.get("image")
 
         if image:
-            image_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{image.filename}"
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            image_filename = f"{timestamp}_{image.filename}"
             image.save(os.path.join(IMAGE_FOLDER, image_filename))
             data["image_filename"] = image_filename
     else:
-        # Regular JSON body
         data = request.get_json() or {}
 
     required = ["title", "description", "category", "price", "location", "seller_id"]
@@ -120,11 +106,11 @@ def add_item():
 
 # ---------------------------------------------------------
 # GET /items/all
-# Return ALL items (with seller username)
+# Return all items
 # ---------------------------------------------------------
 @items_bp.route("/all", methods=["GET"])
 def get_all_items():
-    """Get all items, including seller username."""
+    """Return all items, including seller username."""
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -147,22 +133,18 @@ def get_all_items():
         """
     )
 
-    rows = [dict(row) for row in cursor.fetchall()]
+    items = [dict(row) for row in cursor.fetchall()]
     conn.close()
 
-    return jsonify({"status": "success", "data": {"items": rows}}), 200
+    return jsonify({"status": "success", "data": {"items": items}}), 200
 
 
 # ---------------------------------------------------------
-# NEW: GET /items/seller/<seller_id>
-# All items listed by a specific seller
+# GET /items/seller/<seller_id>
 # ---------------------------------------------------------
 @items_bp.route("/seller/<int:seller_id>", methods=["GET"])
 def get_items_by_seller(seller_id):
-    """
-    Get all items created by a specific seller.
-    Used by SellerDashboard to show "Your Active Listings".
-    """
+    """Return all items created by a given seller."""
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -187,19 +169,18 @@ def get_items_by_seller(seller_id):
         (seller_id,),
     )
 
-    rows = [dict(row) for row in cursor.fetchall()]
+    items = [dict(row) for row in cursor.fetchall()]
     conn.close()
 
-    return jsonify({"status": "success", "data": {"items": rows}}), 200
+    return jsonify({"status": "success", "data": {"items": items}}), 200
 
 
 # ---------------------------------------------------------
 # GET /items/<item_id>
-# Single item by id (with seller username)
 # ---------------------------------------------------------
 @items_bp.route("/<int:item_id>", methods=["GET"])
 def get_item_by_id(item_id):
-    """Get a single item by id, including seller username."""
+    """Return a single item by ID."""
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -234,22 +215,18 @@ def get_item_by_id(item_id):
 
 # ---------------------------------------------------------
 # PUT /items/update/<item_id>
-# Update basic item fields
 # ---------------------------------------------------------
 @items_bp.route("/update/<int:item_id>", methods=["PUT"])
 def update_item(item_id):
-    """Update item title/description/category/price/location."""
+    """Update editable item fields (title, description, category, price, location)."""
     data = request.get_json() or {}
-    allowed = ["title", "description", "category", "price", "location"]
+    allowed_fields = ["title", "description", "category", "price", "location"]
 
-    updates = {k: v for k, v in data.items() if k in allowed}
+    updates = {key: data[key] for key in data if key in allowed_fields}
     if not updates:
-        return (
-            jsonify({"status": "error", "message": "No valid fields to update"}),
-            400,
-        )
+        return jsonify({"status": "error", "message": "No valid fields to update"}), 400
 
-    set_clause = ", ".join([f"{field} = ?" for field in updates.keys()])
+    set_clause = ", ".join(f"{field} = ?" for field in updates.keys())
     values = list(updates.values()) + [item_id]
 
     conn = get_db_connection()
@@ -258,18 +235,9 @@ def update_item(item_id):
     conn.commit()
     conn.close()
 
-    return (
-        jsonify(
-            {
-                "status": "success",
-                "data": {
-                    "item_id": item_id,
-                    "updated_fields": list(updates.keys()),
-                },
-            }
-        ),
-        200,
-    )
+    return jsonify(
+        {"status": "success", "data": {"item_id": item_id, "updated_fields": list(updates)}}
+    ), 200
 
 
 # ---------------------------------------------------------
@@ -277,7 +245,7 @@ def update_item(item_id):
 # ---------------------------------------------------------
 @items_bp.route("/delete/<int:item_id>", methods=["DELETE"])
 def delete_item(item_id):
-    """Delete an item by id."""
+    """Delete an item by ID."""
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -289,23 +257,21 @@ def delete_item(item_id):
     if deleted == 0:
         return jsonify({"status": "error", "message": "Item not found"}), 404
 
-    return (
-        jsonify({"status": "success", "message": f"Item {item_id} deleted"}),
-        200,
-    )
+    return jsonify({"status": "success", "message": f"Item {item_id} deleted"}), 200
 
 
 # ---------------------------------------------------------
-# GET /items/search?query=...
-# Search by title or category (with seller username)
+# GET /items/search
 # ---------------------------------------------------------
 @items_bp.route("/search", methods=["GET"])
 def search_items():
-    """Search items by title or category; includes seller username."""
+    """Search items by title or category."""
     query = request.args.get("query", "").strip()
 
     if not query:
         return jsonify({"status": "error", "message": "Missing search query"}), 400
+
+    search_term = f"%{query}%"
 
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -328,7 +294,7 @@ def search_items():
         WHERE items.title LIKE ? OR items.category LIKE ?
         ORDER BY items.created_at DESC
         """,
-        (f"%query%", f"%query%"),
+        (search_term, search_term),
     )
 
     results = [dict(row) for row in cursor.fetchall()]
