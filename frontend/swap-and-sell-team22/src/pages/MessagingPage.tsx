@@ -31,15 +31,12 @@ export default function MessagingPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [content, setContent] = useState("");
 
-  // If we are missing basic info, bail
-  if (!currentUserId || !otherUserId || !itemId) {
-    return <p style={{ padding: "20px" }}>Error loading conversation.</p>;
-  }
-
   // -----------------------------
   // Fetch item (to know the true seller_id + title)
   // -----------------------------
   useEffect(() => {
+    if (!itemId) return;
+    
     fetch(`${BASE_URL}/items/${itemId}`)
       .then((res) => res.json())
       .then((data) => {
@@ -58,6 +55,8 @@ export default function MessagingPage() {
   // Fetch "other" user's username (buyer or seller)
   // -----------------------------
   useEffect(() => {
+    if (!otherUserId) return;
+    
     fetch(`${BASE_URL}/users/${otherUserId}`)
       .then((res) => res.json())
       .then((data) => {
@@ -139,6 +138,11 @@ export default function MessagingPage() {
         loadMessages(item);
       })
       .catch(() => {});
+  }
+
+  // Move the conditional return AFTER all hooks
+  if (!currentUserId || !otherUserId || !itemId) {
+    return <p style={{ padding: "20px" }}>Error loading conversation.</p>;
   }
 
   return (
