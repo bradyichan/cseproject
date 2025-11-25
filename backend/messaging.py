@@ -1,7 +1,6 @@
 """
 Module: messaging.py
-Description: Manages messaging between users in the Marketplace API.
-Now includes proper inbox endpoint for SellerDashboard.
+Description: Handles messaging between Marketplace users.
 Author: Team 22 - CSE 2102
 """
 
@@ -16,16 +15,15 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "db", "marketplace.db")
 
 
 def get_db_connection():
+    """Return a SQLite connection for messaging operations."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 
-# ---------------------------------------------------------------------
-# POST /messaging/send
-# ---------------------------------------------------------------------
 @messaging_bp.route("/send", methods=["POST"])
 def send_message():
+    """Send a message in an existing conversation."""
     data = request.get_json() or {}
     required = ["conversation_id", "sender_id", "receiver_id", "content"]
 
@@ -72,11 +70,9 @@ def send_message():
     )
 
 
-# ---------------------------------------------------------------------
-# GET /messaging/conversation/<conversation_id>
-# ---------------------------------------------------------------------
 @messaging_bp.route("/conversation/<string:conversation_id>", methods=["GET"])
 def get_conversation(conversation_id):
+    """Return all messages in a conversation."""
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -99,11 +95,9 @@ def get_conversation(conversation_id):
     return jsonify({"status": "success", "data": {"conversation": rows}}), 200
 
 
-# ---------------------------------------------------------------------
-# GET /messaging/user/<user_id>
-# ---------------------------------------------------------------------
 @messaging_bp.route("/user/<int:user_id>", methods=["GET"])
 def get_user_conversations(user_id):
+    """Return all conversation IDs involving the specified user."""
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -123,11 +117,9 @@ def get_user_conversations(user_id):
     return jsonify({"status": "success", "data": {"conversations": convos}}), 200
 
 
-# ---------------------------------------------------------------------
-# DELETE /messaging/delete/<message_id>
-# ---------------------------------------------------------------------
 @messaging_bp.route("/delete/<int:message_id>", methods=["DELETE"])
 def delete_message(message_id):
+    """Delete a message by ID."""
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -141,44 +133,17 @@ def delete_message(message_id):
         return jsonify({"status": "error", "message": "Message not found"}), 404
 
     return (
-        jsonify(
-            {"status": "success", "message": f"Message {message_id} deleted"}
-        ),
+        jsonify({"status": "success", "message": f"Message {message_id} deleted"}),
         200,
     )
 
 
-# ---------------------------------------------------------------------
-# ⭐ NEW: GET /messaging/inbox/<seller_id>
-# Returns all unique buyers who messaged this seller about an item.
-#
-# conversation_id format we assume:
-#   "conv_<buyer_id>_<seller_id>_<item_id>"
-# ---------------------------------------------------------------------
 @messaging_bp.route("/inbox/<int:seller_id>", methods=["GET"])
 def get_inbox(seller_id):
-    """
-    Example return:
-    {
-      "status": "success",
-      "data": {
-        "conversations": [
-          {
-            "buyer_id": 3,
-            "buyer_username": "alex",
-            "item_id": 10,
-            "item_title": "Xbox",
-            "conversation_id": "conv_3_7_10"
-          }
-        ]
-      }
-    }
-    """
-
+    """Return all unique buyers who messaged this seller for any item."""
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Get all distinct conversations where this user was the receiver (seller)
     cursor.execute(
         """
         SELECT DISTINCT conversation_id
@@ -189,60 +154,44 @@ def get_inbox(seller_id):
     )
 
     rows = cursor.fetchall()
-
     conversations = []
 
     for row in rows:
         conv_id = row["conversation_id"]
         parts = conv_id.split("_")
 
-        # Expect: ["conv", buyerId, sellerIdInConv, itemId]
         if len(parts) != 4 or parts[0] != "conv":
-            # Skip malformed conversation IDs
             continue
 
         try:
             buyer_id = int(parts[1])
-            seller_id_in_conv = int(parts[2])
+            seller_check = int(parts[2])
             item_id = int(parts[3])
         except ValueError:
-            # Skip if any part isn't an int
             continue
 
-        # Make sure this convo is really for this seller
-        if seller_id_in_conv != seller_id:
+        if seller_check != seller_id:
             continue
 
-        # Look up buyer username
-        cursor.execute(
-            "SELECT username FROM users WHERE id = ?",
-            (buyer_id,),
-        )
+        cursor.execute("SELECT username FROM users WHERE id = ?", (buyer_id,))
         buyer_row = cursor.fetchone()
         if not buyer_row:
             continue
-        buyer_username = buyer_row["username"]
 
-        # Look up item title
-        cursor.execute(
-            "SELECT title FROM items WHERE id = ?",
-            (item_id,),
-        )
+        cursor.execute("SELECT title FROM items WHERE id = ?", (item_id,))
         item_row = cursor.fetchone()
         if not item_row:
             continue
-        item_title = item_row["title"]
 
         conversations.append(
             {
                 "buyer_id": buyer_id,
-                "buyer_username": buyer_username,
+                "buyer_username": buyer_row["username"],
                 "item_id": item_id,
-                "item_title": item_title,
+                "item_title": item_row["title"],
                 "conversation_id": conv_id,
             }
         )
 
     conn.close()
-
     return jsonify({"status": "success", "data": {"conversations": conversations}}), 200
