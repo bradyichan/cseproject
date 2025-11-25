@@ -57,7 +57,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-      # Run pytest on your pulled codebase
+
+      # Make "backend" importable during pytest by adding the repository folder to PYTHONPATH
       - name: Test with pytest
+        env:
+          PYTHONPATH: ${{ github.workspace }}/cse2102-fall25-Team22
         run: |
           pytest
