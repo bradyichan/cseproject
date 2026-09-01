@@ -1,4 +1,3 @@
-# cse2102-fall25-Team22
 **Team Members:**
 - Brady Chan
 - Samuel C Mason
