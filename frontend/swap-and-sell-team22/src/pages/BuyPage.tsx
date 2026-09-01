@@ -31,6 +31,27 @@ export default function BuyPage() {
     item.title.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  async function handleDeleteItem(itemId: number) {
+    if (!window.confirm("Are you sure you want to delete this item?")) return;
+
+    try {
+      const res = await fetch(`http://127.0.0.1:6767/items/delete/${itemId}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setItems((prev) => prev.filter((i) => i.item_id !== itemId));
+        alert("Item deleted!");
+      } else {
+        alert(data.message || "Delete failed.");
+      }
+    } catch (err) {
+      alert(err);
+    }
+  }
+
   return (
     <div className="buy-wrapper" style={{ padding: "20px" }}>
       <div className="buy-header">
@@ -75,6 +96,15 @@ export default function BuyPage() {
                   <p className="state">{item.location}</p>
                 </div>
               </Link>
+
+              {/* DELETE BUTTON — OUTSIDE THE LINK */}
+              <button
+                onClick={() => handleDeleteItem(item.item_id)}
+                className="delete-btn"
+              >
+                Delete Item
+              </button>
+
             </div>
           );
         })}
